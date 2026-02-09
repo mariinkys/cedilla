@@ -9,7 +9,9 @@ use cosmic::app::context_drawer;
 use cosmic::iced::{Length, Subscription};
 use cosmic::iced_widget::{center, column, row};
 use cosmic::widget::{self, about::About, menu};
-use cosmic::widget::{Space, ToastId, Toasts, container, text, text_editor, toaster};
+use cosmic::widget::{
+    Space, ToastId, Toasts, container, markdown, scrollable, text, text_editor, toaster,
+};
 use cosmic::{prelude::*, surface};
 use std::collections::HashMap;
 use std::path::{Path, PathBuf};
@@ -51,7 +53,9 @@ enum State {
         /// Current if/any file path
         path: Option<PathBuf>,
         /// Text Editor Content
-        content: text_editor::Content,
+        editor_content: text_editor::Content,
+        /// Markdown preview items
+        items: Vec<markdown::Item>,
         /// Track if any changes have been made to the current file
         is_dirty: bool,
     },
@@ -176,9 +180,10 @@ impl cosmic::Application for AppModel {
             State::Loading => center(text(fl!("loading"))).into(),
             State::Ready {
                 path,
-                content,
+                editor_content,
+                items,
                 is_dirty,
-            } => cedilla_main_view(path, content, is_dirty),
+            } => cedilla_main_view(path, editor_content, items, is_dirty),
         };
 
         toaster(&self.toasts, container(content).center(Length::Fill))
@@ -296,16 +301,18 @@ impl cosmic::Application for AppModel {
             Message::NewFile => {
                 self.state = State::Ready {
                     path: None,
-                    content: text_editor::Content::new(),
+                    editor_content: text_editor::Content::new(),
+                    items: vec![],
                     is_dirty: true,
                 };
                 Task::none()
             }
             Message::SaveFile => {
                 let State::Ready {
-                    content,
+                    editor_content,
                     path,
                     is_dirty,
+                    ..
                 } = &mut self.state
                 else {
                     return Task::none();
@@ -315,7 +322,7 @@ impl cosmic::Application for AppModel {
                     return Task::none();
                 }
 
-                let content = content.text();
+                let content = editor_content.text();
                 let path = path.clone();
 
                 Task::perform(
@@ -343,7 +350,8 @@ impl cosmic::Application for AppModel {
                 Ok((path, content)) => {
                     self.state = State::Ready {
                         path: Some(path),
-                        content: text_editor::Content::with_text(content.as_ref()),
+                        editor_content: text_editor::Content::with_text(content.as_ref()),
+                        items: markdown::parse(content.as_ref()).collect(),
                         is_dirty: false,
                     };
                     Task::none()
@@ -352,14 +360,16 @@ impl cosmic::Application for AppModel {
             },
             Message::Edit(action) => {
                 let State::Ready {
-                    content, is_dirty, ..
+                    editor_content,
+                    is_dirty,
+                    ..
                 } = &mut self.state
                 else {
                     return Task::none();
                 };
 
                 *is_dirty = *is_dirty || action.is_edit();
-                content.perform(action);
+                editor_content.perform(action);
 
                 Task::none()
             }
@@ -423,10 +433,11 @@ impl AppModel {
 /// View of the header of this screen
 fn cedilla_main_view<'a>(
     path: &'a Option<PathBuf>,
-    content: &'a text_editor::Content,
+    editor_content: &'a text_editor::Content,
+    items: &'a [markdown::Item],
     _is_dirty: &'a bool,
 ) -> Element<'a, Message> {
-    let editor = text_editor(content)
+    let editor = text_editor(editor_content)
         .highlight_with::<SyntectHighlighter>(
             utils::SyntectSettings {
                 theme: String::from("GitHub"),
@@ -441,6 +452,13 @@ fn cedilla_main_view<'a>(
         .on_action(Message::Edit)
         .height(Length::Fill);
 
+    let preview = markdown(
+        items,
+        markdown::Settings::default(),
+        markdown::Style::from_palette(cosmic::iced::Theme::palette(&cosmic::iced::Theme::Dark)),
+    )
+    .map(|u| Message::LaunchUrl(u.to_string()));
+
     let status_bar = {
         let file_path = match path.as_deref().and_then(Path::to_str) {
             Some(path) => text(path),
@@ -448,14 +466,24 @@ fn cedilla_main_view<'a>(
         };
 
         let position = {
-            let (line, column) = content.cursor_position();
+            let (line, column) = editor_content.cursor_position();
             text(format!("{}:{}", line + 1, column + 1))
         };
 
         row![file_path, Space::with_width(Length::Fill), position]
     };
 
-    container(column![editor, status_bar].spacing(10.))
-        .padding(5.)
-        .into()
+    container(
+        column![
+            row![
+                editor,
+                scrollable(preview).spacing(10.).height(Length::Fill)
+            ]
+            .spacing(10.),
+            status_bar
+        ]
+        .spacing(10.),
+    )
+    .padding(5.)
+    .into()
 }

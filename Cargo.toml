@@ -46,6 +46,8 @@ features = [
    "wgpu",
    # XDG portal integration for Flatpak theme detection
    "xdg-portal",
+   # Markdown widget support
+   "markdown",
 ]
 
 # Uncomment to test a locally-cloned libcosmic
