@@ -384,6 +384,7 @@ impl cosmic::Application for AppModel {
                 let State::Ready {
                     editor_content,
                     is_dirty,
+                    items,
                     ..
                 } = &mut self.state
                 else {
@@ -392,6 +393,7 @@ impl cosmic::Application for AppModel {
 
                 *is_dirty = *is_dirty || action.is_edit();
                 editor_content.perform(action);
+                *items = markdown::parse(editor_content.text().as_ref()).collect();
 
                 Task::none()
             }
@@ -482,8 +484,8 @@ fn cedilla_main_view<'a>(
 
     let pane_grid = pane_grid::PaneGrid::new(panes, |_pane, content, _is_focused| {
         let (title, icon_name) = match content {
-            PaneContent::Editor => ("Editor", "text-editor-symbolic"),
-            PaneContent::Preview => ("Preview", "view-paged-symbolic"),
+            PaneContent::Editor => (fl!("editor"), "text-editor-symbolic"),
+            PaneContent::Preview => (fl!("preview"), "view-paged-symbolic"),
         };
 
         let title_content = row![
