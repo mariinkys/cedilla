@@ -781,9 +781,11 @@ dependencies = [
  "i18n-embed-fl",
  "libcosmic",
  "open",
+ "pulldown-cmark",
  "rust-embed",
  "serde",
  "tokio",
+ "url",
 ]
 
 [[package]]
@@ -2421,11 +2423,9 @@ dependencies = [
  "num-traits",
  "once_cell",
  "ouroboros",
- "pulldown-cmark",
  "rustc-hash 2.1.1",
  "thiserror 1.0.69",
  "unicode-segmentation",
- "url",
  "window_clipboard",
 ]
 
@@ -4064,9 +4064,9 @@ checksum = "3eb8486b569e12e2c32ad3e204dbaba5e4b5b216e9367044f25f1dba42341773"
 
 [[package]]
 name = "pulldown-cmark"
-version = "0.12.2"
+version = "0.13.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "f86ba2052aebccc42cbbb3ed234b8b13ce76f75c3551a303cb2bcffcff12bb14"
+checksum = "1e8bbe1a966bd2f362681a44f6edce3c2310ac21e4d5067a6e7ec396297a6ea0"
 dependencies = [
  "bitflags 2.10.0",
  "getopts",
