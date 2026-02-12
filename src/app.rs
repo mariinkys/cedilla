@@ -2,11 +2,11 @@
 
 use crate::app::app_menu::MenuAction;
 use crate::app::context_page::ContextPage;
-use crate::app::core::utils::{self, CedillaToast, SyntectHighlighter};
+use crate::app::core::utils::{self, CedillaToast};
 use crate::config::{AppTheme, CedillaConfig};
 use crate::fl;
 use cosmic::app::context_drawer;
-use cosmic::iced::{Length, Subscription};
+use cosmic::iced::{Length, Subscription, highlighter};
 use cosmic::iced_widget::{center, column, row};
 use cosmic::widget::{self, about::About, menu};
 use cosmic::widget::{
@@ -438,16 +438,16 @@ fn cedilla_main_view<'a>(
     _is_dirty: &'a bool,
 ) -> Element<'a, Message> {
     let editor = text_editor(editor_content)
-        .highlight_with::<SyntectHighlighter>(
-            utils::SyntectSettings {
-                theme: String::from("GitHub"),
-                extension: path
+        .highlight_with::<highlighter::Highlighter>(
+            highlighter::Settings {
+                theme: highlighter::Theme::InspiredGitHub,
+                token: path
                     .as_ref()
                     .and_then(|path| path.extension()?.to_str())
                     .unwrap_or("md")
                     .to_string(),
             },
-            |highlight, _theme| utils::to_format(highlight),
+            |highlight, _theme| highlight.to_format(),
         )
         .on_action(Message::Edit)
         .height(Length::Fill);

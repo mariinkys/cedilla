@@ -783,7 +783,6 @@ dependencies = [
  "open",
  "rust-embed",
  "serde",
- "syntect",
  "tokio",
 ]
 
@@ -2230,6 +2229,7 @@ dependencies = [
  "iced_accessibility",
  "iced_core",
  "iced_futures",
+ "iced_highlighter",
  "iced_renderer",
  "iced_widget",
  "iced_winit",
@@ -2322,6 +2322,16 @@ dependencies = [
 ]
 
 [[package]]
+name = "iced_highlighter"
+version = "0.14.0-dev"
+source = "git+https://github.com/pop-os/libcosmic.git#3e78eb238159d90956e85e95e868164671b649f6"
+dependencies = [
+ "iced_core",
+ "once_cell",
+ "syntect",
+]
+
+[[package]]
 name = "iced_renderer"
 version = "0.14.0-dev"
 source = "git+https://github.com/pop-os/libcosmic.git#3e78eb238159d90956e85e95e868164671b649f6"
@@ -2404,6 +2414,7 @@ dependencies = [
  "cosmic-client-toolkit",
  "dnd",
  "iced_accessibility",
+ "iced_highlighter",
  "iced_renderer",
  "iced_runtime",
  "log",

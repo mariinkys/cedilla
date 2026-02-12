@@ -20,7 +20,6 @@ rust-embed = "8.11.0"
 serde = { version = "1.0.228", features = ["derive"] }
 tokio = { version = "1.49.0", features = ["fs"] }
 anywho = "0.1.2"
-syntect = "5.3.0"
 
 [dependencies.libcosmic]
 git = "https://github.com/pop-os/libcosmic.git"
@@ -48,6 +47,8 @@ features = [
    "xdg-portal",
    # Markdown widget support
    "markdown",
+   # Highlighter support
+   "highlighter",
 ]
 
 # Uncomment to test a locally-cloned libcosmic
