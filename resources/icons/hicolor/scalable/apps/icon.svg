@@ -1,2 +1,82 @@
-<?xml version="1.0" encoding="UTF-8"?>
-<svg viewBox="0 0 128 128" xmlns="http://www.w3.org/2000/svg"/>
+<?xml version="1.0" encoding="UTF-8" ?>
+<svg
+    width="128"
+    height="128"
+    viewBox="0 0 128 128"
+    xmlns="http://www.w3.org/2000/svg"
+>
+
+  <!-- Outer soft shadow -->
+  <rect
+        x="18"
+        y="22"
+        width="92"
+        height="92"
+        rx="24"
+        fill="#000000"
+        opacity="0.08"
+    />
+
+  <!-- Main manuscript block -->
+  <rect x="16" y="16" width="96" height="96" rx="24" fill="url(#paperGrad)" />
+
+  <!-- Subtle inset surface -->
+  <rect
+        x="26"
+        y="26"
+        width="76"
+        height="76"
+        rx="18"
+        fill="#F8CD63"
+        opacity="0.6"
+    />
+
+  <!-- Embossed Ç -->
+  <g transform="translate(67,57)">
+
+    <!-- Engrave shadow -->
+    <path
+            d="
+      M20 -20
+      A28 28 0 1 0 20 20
+      L10 10
+      A18 18 0 1 1 10 -10
+      Z"
+            fill="#000000"
+            opacity="0.15"
+            transform="translate(1.5,1.5)"
+        />
+
+    <!-- Main Ç -->
+    <path
+            d="
+      M20 -20
+      A28 28 0 1 0 20 20
+      L10 10
+      A18 18 0 1 1 10 -10
+      Z"
+            fill="#2A2A2A"
+        />
+
+    <!-- Cedilla -->
+    <path
+            d="
+      M-2 24
+      C-2 32 12 32 12 42
+      C12 50 -8 50 -12 38"
+            stroke="#2A2A2A"
+            stroke-width="6"
+            fill="none"
+            stroke-linecap="round"
+        />
+
+  </g>
+
+  <defs>
+    <linearGradient id="paperGrad" x1="0" y1="16" x2="0" y2="112">
+      <stop offset="0%" stop-color="#F9D46B" />
+      <stop offset="100%" stop-color="#E6AE2F" />
+    </linearGradient>
+  </defs>
+
+</svg>
