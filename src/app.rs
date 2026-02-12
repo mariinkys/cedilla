@@ -148,10 +148,7 @@ impl cosmic::Application for AppModel {
         let tasks = vec![
             app.update_title(),
             cosmic::command::set_theme(app.config.app_theme.theme()),
-            Task::perform(
-                utils::files::load_file("/home/mariinkys/Downloads/gsoc.txt".into()),
-                |res| cosmic::action::app(Message::OpenFile(res)),
-            ),
+            Task::done(cosmic::action::app(Message::NewFile)),
         ];
 
         (app, Task::batch(tasks))
