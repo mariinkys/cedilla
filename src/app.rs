@@ -6,13 +6,13 @@ use crate::app::core::utils::{self, CedillaToast};
 use crate::config::{AppTheme, CedillaConfig};
 use crate::fl;
 use cosmic::app::context_drawer;
-use cosmic::iced::{Length, Subscription, highlighter};
+use cosmic::iced::{Alignment, Length, Subscription, highlighter};
 use cosmic::iced_widget::{center, column, row};
 use cosmic::widget::{self, about::About, menu};
 use cosmic::widget::{
-    Space, ToastId, Toasts, container, markdown, scrollable, text, text_editor, toaster,
+    Space, ToastId, Toasts, container, markdown, pane_grid, scrollable, text, text_editor, toaster,
 };
-use cosmic::{prelude::*, surface};
+use cosmic::{prelude::*, surface, theme};
 use std::collections::HashMap;
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
@@ -58,7 +58,16 @@ enum State {
         items: Vec<markdown::Item>,
         /// Track if any changes have been made to the current file
         is_dirty: bool,
+        /// Pane grid state
+        panes: pane_grid::State<PaneContent>,
     },
+}
+
+/// Content type for each pane
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum PaneContent {
+    Editor,
+    Preview,
 }
 
 /// Messages emitted by the application and its widgets.
@@ -91,6 +100,11 @@ pub enum Message {
     Edit(text_editor::Action),
     /// Callback after saving the current file
     FileSaved(Result<PathBuf, anywho::Error>),
+
+    /// Pane grid resized callback
+    PaneResized(pane_grid::ResizeEvent),
+    /// Pane grid dragged callback
+    PaneDragged(pane_grid::DragEvent),
 }
 
 /// Create a COSMIC application from the app model
@@ -180,7 +194,8 @@ impl cosmic::Application for AppModel {
                 editor_content,
                 items,
                 is_dirty,
-            } => cedilla_main_view(path, editor_content, items, is_dirty),
+                panes,
+            } => cedilla_main_view(path, editor_content, items, is_dirty, panes),
         };
 
         toaster(&self.toasts, container(content).center(Length::Fill))
@@ -296,11 +311,16 @@ impl cosmic::Application for AppModel {
             }
 
             Message::NewFile => {
+                // Create initial pane configuration with editor on left, preview on right
+                let (mut panes, first_pane) = pane_grid::State::new(PaneContent::Editor);
+                panes.split(pane_grid::Axis::Vertical, first_pane, PaneContent::Preview);
+
                 self.state = State::Ready {
                     path: None,
                     editor_content: text_editor::Content::new(),
                     items: vec![],
                     is_dirty: true,
+                    panes,
                 };
                 Task::none()
             }
@@ -345,11 +365,16 @@ impl cosmic::Application for AppModel {
             }
             Message::OpenFile(result) => match result {
                 Ok((path, content)) => {
+                    // Create initial pane configuration (TODO: Move this to a helper func (also used in NewFile))
+                    let (mut panes, first_pane) = pane_grid::State::new(PaneContent::Editor);
+                    panes.split(pane_grid::Axis::Vertical, first_pane, PaneContent::Preview);
+
                     self.state = State::Ready {
                         path: Some(path),
                         editor_content: text_editor::Content::with_text(content.as_ref()),
                         items: markdown::parse(content.as_ref()).collect(),
                         is_dirty: false,
+                        panes,
                     };
                     Task::none()
                 }
@@ -383,6 +408,24 @@ impl cosmic::Application for AppModel {
                 }
                 Err(e) => self.update(Message::AddToast(CedillaToast::new(e))),
             },
+
+            Message::PaneResized(event) => {
+                let State::Ready { panes, .. } = &mut self.state else {
+                    return Task::none();
+                };
+
+                panes.resize(event.split, event.ratio);
+                Task::none()
+            }
+            Message::PaneDragged(pane_grid::DragEvent::Dropped { pane, target }) => {
+                let State::Ready { panes, .. } = &mut self.state else {
+                    return Task::none();
+                };
+
+                panes.drop(pane, target);
+                Task::none()
+            }
+            Message::PaneDragged(_) => Task::none(),
         }
     }
 }
@@ -433,54 +476,95 @@ fn cedilla_main_view<'a>(
     editor_content: &'a text_editor::Content,
     items: &'a [markdown::Item],
     _is_dirty: &'a bool,
+    panes: &'a pane_grid::State<PaneContent>,
 ) -> Element<'a, Message> {
-    let editor = text_editor(editor_content)
-        .highlight_with::<highlighter::Highlighter>(
-            highlighter::Settings {
-                theme: highlighter::Theme::InspiredGitHub,
-                token: path
-                    .as_ref()
-                    .and_then(|path| path.extension()?.to_str())
-                    .unwrap_or("md")
-                    .to_string(),
-            },
-            |highlight, _theme| highlight.to_format(),
-        )
-        .on_action(Message::Edit)
-        .height(Length::Fill);
+    let spacing = theme::active().cosmic().spacing;
 
-    let preview = markdown(
-        items,
-        markdown::Settings::default(),
-        markdown::Style::from_palette(cosmic::iced::Theme::palette(&cosmic::iced::Theme::Dark)),
-    )
-    .map(|u| Message::LaunchUrl(u.to_string()));
+    let pane_grid = pane_grid::PaneGrid::new(panes, |_pane, content, _is_focused| {
+        let (title, icon_name) = match content {
+            PaneContent::Editor => ("Editor", "text-editor-symbolic"),
+            PaneContent::Preview => ("Preview", "view-paged-symbolic"),
+        };
+
+        let title_content = row![
+            widget::icon::from_name(icon_name).size(16),
+            text(title).size(14),
+        ]
+        .spacing(spacing.space_xxs)
+        .padding([5, spacing.space_xxs])
+        .align_y(Alignment::Center);
+
+        let pane_content: Element<'a, Message> = match content {
+            PaneContent::Editor => container(
+                text_editor(editor_content)
+                    .highlight_with::<highlighter::Highlighter>(
+                        highlighter::Settings {
+                            theme: highlighter::Theme::InspiredGitHub,
+                            token: path
+                                .as_ref()
+                                .and_then(|path| path.extension()?.to_str())
+                                .unwrap_or("md")
+                                .to_string(),
+                        },
+                        |highlight, _theme| highlight.to_format(),
+                    )
+                    .on_action(Message::Edit)
+                    .height(Length::Fill),
+            )
+            .padding([5, spacing.space_xxs])
+            .width(Length::Fill)
+            .height(Length::Fill)
+            .into(),
+            PaneContent::Preview => container(
+                scrollable(
+                    markdown(
+                        items,
+                        markdown::Settings::default(),
+                        markdown::Style::from_palette(cosmic::iced::Theme::palette(
+                            &cosmic::iced::Theme::Dark,
+                        )),
+                    )
+                    .map(|u| Message::LaunchUrl(u.to_string())),
+                )
+                .spacing(spacing.space_xxs),
+            )
+            .padding(spacing.space_xxs)
+            .width(Length::Fill)
+            .height(Length::Fill)
+            .into(),
+        };
+
+        pane_grid::Content::new(pane_content)
+            .title_bar(pane_grid::TitleBar::new(title_content))
+            .class(theme::Container::Card)
+    })
+    .on_drag(Message::PaneDragged)
+    .on_resize(10, Message::PaneResized)
+    .spacing(spacing.space_xxs);
 
     let status_bar = {
         let file_path = match path.as_deref().and_then(Path::to_str) {
-            Some(path) => text(path),
-            None => text(fl!("new-file")),
+            Some(path) => text(path).size(12),
+            None => text(fl!("new-file")).size(12),
         };
 
         let position = {
             let (line, column) = editor_content.cursor_position();
-            text(format!("{}:{}", line + 1, column + 1))
+            text(format!("{}:{}", line + 1, column + 1)).size(12)
         };
 
-        row![file_path, Space::with_width(Length::Fill), position]
+        container(
+            row![file_path, Space::with_width(Length::Fill), position]
+                .padding(spacing.space_xxs)
+                .spacing(spacing.space_xxs),
+        )
+        .width(Length::Fill)
+        .class(theme::Container::Card)
     };
 
-    container(
-        column![
-            row![
-                editor,
-                scrollable(preview).spacing(10.).height(Length::Fill)
-            ]
-            .spacing(10.),
-            status_bar
-        ]
-        .spacing(10.),
-    )
-    .padding(5.)
-    .into()
+    container(column![pane_grid, status_bar].spacing(spacing.space_xxxs))
+        .padding(spacing.space_xxs)
+        .width(Length::Fill)
+        .height(Length::Fill)
+        .into()
 }
