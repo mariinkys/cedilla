@@ -521,14 +521,8 @@ fn cedilla_main_view<'a>(
             .into(),
             PaneContent::Preview => container(
                 scrollable(
-                    markdown(
-                        items,
-                        markdown::Settings::default(),
-                        markdown::Style::from_palette(cosmic::iced::Theme::palette(
-                            &cosmic::iced::Theme::Dark,
-                        )),
-                    )
-                    .map(|u| Message::LaunchUrl(u.to_string())),
+                    markdown::view(items, markdown::Settings::default())
+                        .map(|u| Message::LaunchUrl(u.to_string())),
                 )
                 .spacing(spacing.space_xxs),
             )
