@@ -53,7 +53,9 @@ use cosmic::iced_core::font::{self, Font};
 use cosmic::iced_core::padding;
 use cosmic::iced_core::theme;
 use cosmic::iced_core::{Color, Element, Length, Padding, Pixels, color};
-use cosmic::iced_widget::{column, container, rich_text, row, scrollable, span, text};
+use cosmic::iced_widget::{
+    column, container, horizontal_rule, rich_text, row, rule, scrollable, span, text,
+};
 use cosmic::theme::Theme;
 
 use std::borrow::BorrowMut;
@@ -185,6 +187,8 @@ pub enum Item {
         /// The items of the list.
         items: Vec<Vec<Item>>,
     },
+    /// Horizontal Line
+    Rule,
 }
 
 impl Item {
@@ -303,6 +307,7 @@ impl Item {
             .padding(spacing.0 / 2.0)
             .class(Theme::code_block())
             .into(),
+            Item::Rule => container(horizontal_rule(1.)).width(Length::Fill).into(),
         }
     }
 }
@@ -785,6 +790,7 @@ fn parse_with<'a>(
             }
             _ => None,
         },
+        pulldown_cmark::Event::Rule => produce(state.borrow_mut(), &mut lists, Item::Rule, source),
         pulldown_cmark::Event::Text(text) if !metadata && !table => {
             if let Some(highlighter) = &mut highlighter {
                 for line in text.lines() {
@@ -1046,7 +1052,9 @@ where
 }
 
 /// The theme catalog of Markdown items.
-pub trait Catalog: container::Catalog + scrollable::Catalog + text::Catalog {
+pub trait Catalog:
+    container::Catalog + scrollable::Catalog + text::Catalog + rule::Catalog
+{
     /// The styling class of a Markdown code block.
     fn code_block<'a>() -> <Self as container::Catalog>::Class<'a>;
 }
