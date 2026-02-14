@@ -1,5 +1,8 @@
 #![allow(dead_code)]
 
+// This is an adapted version of the official iced markdown widget: https://github.com/iced-rs/iced/blob/master/widget/src/markdown.rs
+// it has been modified to work with the current version of libcosmic, original code by @hecrj
+
 //! Markdown widgets can parse and display Markdown.
 //!
 //! You can enable the `highlighter` feature for syntax highlighting
@@ -79,6 +82,15 @@ pub struct Content {
     items: Vec<Item>,
     incomplete: HashMap<usize, Section>,
     state: State,
+}
+
+/// Messages that can be emitted by the markdown viewer
+#[derive(Debug, Clone)]
+pub enum MarkdownMessage {
+    /// A link was clicked
+    LinkClicked(Url),
+    /// An image became visible and should be loaded
+    ImageShown(Url),
 }
 
 #[derive(Debug)]
@@ -256,7 +268,7 @@ pub struct Row {
 pub struct Text {
     spans: Vec<Span>,
     last_style: Cell<Option<Style>>,
-    last_styled_spans: RefCell<Arc<[text::Span<'static, Url>]>>,
+    last_styled_spans: RefCell<Arc<[text::Span<'static, MarkdownMessage>]>>,
 }
 
 impl Text {
@@ -272,7 +284,7 @@ impl Text {
     ///
     /// This method performs caching for you. It will only reallocate if the [`Style`]
     /// provided changes.
-    pub fn spans(&self, style: Style) -> Arc<[text::Span<'static, Url>]> {
+    pub fn spans(&self, style: Style) -> Arc<[text::Span<'static, MarkdownMessage>]> {
         if Some(style) != self.last_style.get() {
             *self.last_styled_spans.borrow_mut() =
                 self.spans.iter().map(|span| span.view(&style)).collect();
@@ -302,7 +314,7 @@ enum Span {
 }
 
 impl Span {
-    fn view(&self, style: &Style) -> text::Span<'static, Url> {
+    fn view(&self, style: &Style) -> text::Span<'static, MarkdownMessage> {
         match self {
             Span::Standard {
                 text,
@@ -339,7 +351,8 @@ impl Span {
                 };
 
                 if let Some(link) = link.as_ref() {
-                    span.color(style.link_color).link(link.clone())
+                    span.color(style.link_color)
+                        .link(MarkdownMessage::LinkClicked(link.clone()))
                 } else {
                     span
                 }
@@ -632,7 +645,11 @@ fn parse_with<'a>(
                 dest_url, title, ..
             } if !metadata => {
                 match Url::parse(&dest_url) {
-                    Ok(url) if url.scheme() == "http" || url.scheme() == "https" => {
+                    Ok(url)
+                        if url.scheme() == "http"
+                            || url.scheme() == "https"
+                            || url.scheme() == "file" =>
+                    {
                         image = Some((url, title.into_string()));
                     }
                     _ => {}
@@ -1148,7 +1165,7 @@ impl From<Theme> for Style {
 pub fn view<'a, Theme, Renderer>(
     items: impl IntoIterator<Item = &'a Item>,
     settings: impl Into<Settings>,
-) -> Element<'a, Url, Theme, Renderer>
+) -> Element<'a, MarkdownMessage, Theme, Renderer>
 where
     Theme: Catalog + 'a,
     Renderer: cosmic::iced_core::text::Renderer<Font = Font> + 'a,
@@ -1165,7 +1182,7 @@ pub fn view_with<'a, Theme, Renderer>(
     items: impl IntoIterator<Item = &'a Item>,
     settings: impl Into<Settings>,
     viewer: &impl Viewer<'a, Theme, Renderer>,
-) -> Element<'a, Url, Theme, Renderer>
+) -> Element<'a, MarkdownMessage, Theme, Renderer>
 where
     Theme: Catalog + 'a,
     Renderer: cosmic::iced_core::text::Renderer<Font = Font> + 'a,
@@ -1186,7 +1203,7 @@ pub fn item<'a, Theme, Renderer>(
     settings: Settings,
     item: &'a Item,
     index: usize,
-) -> Element<'a, Url, Theme, Renderer>
+) -> Element<'a, MarkdownMessage, Theme, Renderer>
 where
     Theme: Catalog + 'a,
     Renderer: cosmic::iced_core::text::Renderer<Font = Font> + 'a,
@@ -1220,7 +1237,7 @@ pub fn heading<'a, Theme, Renderer>(
     level: &'a HeadingLevel,
     text: &'a Text,
     index: usize,
-) -> Element<'a, Url, Theme, Renderer>
+) -> Element<'a, MarkdownMessage, Theme, Renderer>
 where
     Theme: Catalog + 'a,
     Renderer: cosmic::iced_core::text::Renderer<Font = Font> + 'a,
@@ -1256,7 +1273,7 @@ where
 pub fn paragraph<'a, Theme, Renderer>(
     settings: Settings,
     text: &Text,
-) -> Element<'a, Url, Theme, Renderer>
+) -> Element<'a, MarkdownMessage, Theme, Renderer>
 where
     Theme: Catalog + 'a,
     Renderer: cosmic::iced_core::text::Renderer<Font = Font> + 'a,
@@ -1272,7 +1289,7 @@ pub fn unordered_list<'a, Theme, Renderer>(
     viewer: &impl Viewer<'a, Theme, Renderer>,
     settings: Settings,
     bullets: &'a [Bullet],
-) -> Element<'a, Url, Theme, Renderer>
+) -> Element<'a, MarkdownMessage, Theme, Renderer>
 where
     Theme: Catalog + 'a,
     Renderer: cosmic::iced_core::text::Renderer<Font = Font> + 'a,
@@ -1314,7 +1331,7 @@ pub fn ordered_list<'a, Theme, Renderer>(
     settings: Settings,
     start: u64,
     bullets: &'a [Bullet],
-) -> Element<'a, Url, Theme, Renderer>
+) -> Element<'a, MarkdownMessage, Theme, Renderer>
 where
     Theme: Catalog + 'a,
     Renderer: cosmic::iced_core::text::Renderer<Font = Font> + 'a,
@@ -1349,7 +1366,7 @@ where
 pub fn code_block<'a, Theme, Renderer>(
     settings: Settings,
     lines: &'a [Text],
-) -> Element<'a, Url, Theme, Renderer>
+) -> Element<'a, MarkdownMessage, Theme, Renderer>
 where
     Theme: Catalog + 'a,
     Renderer: cosmic::iced_core::text::Renderer<Font = Font> + 'a,
@@ -1381,7 +1398,7 @@ pub fn quote<'a, Theme, Renderer>(
     viewer: &impl Viewer<'a, Theme, Renderer>,
     settings: Settings,
     contents: &'a [Item],
-) -> Element<'a, Url, Theme, Renderer>
+) -> Element<'a, MarkdownMessage, Theme, Renderer>
 where
     Theme: Catalog + 'a,
     Renderer: cosmic::iced_core::text::Renderer<Font = Font> + 'a,
@@ -1405,7 +1422,7 @@ where
 }
 
 /// Displays a rule using the default look.
-pub fn rule<'a, Theme, Renderer>() -> Element<'a, Url, Theme, Renderer>
+pub fn rule<'a, Theme, Renderer>() -> Element<'a, MarkdownMessage, Theme, Renderer>
 where
     Theme: Catalog + 'a,
     Renderer: cosmic::iced_core::text::Renderer<Font = Font> + 'a,
@@ -1419,7 +1436,7 @@ pub fn table<'a, Theme, Renderer>(
     settings: Settings,
     columns: &'a [Column],
     rows: &'a [Row],
-) -> Element<'a, Url, Theme, Renderer>
+) -> Element<'a, MarkdownMessage, Theme, Renderer>
 where
     Theme: Catalog + 'a,
     Renderer: cosmic::iced_core::text::Renderer<Font = Font> + 'a,
@@ -1477,7 +1494,7 @@ pub fn items<'a, Theme, Renderer>(
     viewer: &impl Viewer<'a, Theme, Renderer>,
     settings: Settings,
     items: &'a [Item],
-) -> Element<'a, Url, Theme, Renderer>
+) -> Element<'a, MarkdownMessage, Theme, Renderer>
 where
     Theme: Catalog + 'a,
     Renderer: cosmic::iced_core::text::Renderer<Font = Font> + 'a,
@@ -1508,7 +1525,7 @@ where
         url: &'a Url,
         title: &'a str,
         alt: &Text,
-    ) -> Element<'a, Url, Theme, Renderer> {
+    ) -> Element<'a, MarkdownMessage, Theme, Renderer> {
         let _url = url;
         let _title = title;
 
@@ -1527,14 +1544,18 @@ where
         level: &'a HeadingLevel,
         text: &'a Text,
         index: usize,
-    ) -> Element<'a, Url, Theme, Renderer> {
+    ) -> Element<'a, MarkdownMessage, Theme, Renderer> {
         heading(settings, level, text, index)
     }
 
     /// Displays a paragraph.
     ///
     /// By default, it calls [`paragraph`].
-    fn paragraph(&self, settings: Settings, text: &Text) -> Element<'a, Url, Theme, Renderer> {
+    fn paragraph(
+        &self,
+        settings: Settings,
+        text: &Text,
+    ) -> Element<'a, MarkdownMessage, Theme, Renderer> {
         paragraph(settings, text)
     }
 
@@ -1547,7 +1568,7 @@ where
         language: Option<&'a str>,
         code: &'a str,
         lines: &'a [Text],
-    ) -> Element<'a, Url, Theme, Renderer> {
+    ) -> Element<'a, MarkdownMessage, Theme, Renderer> {
         let _language = language;
         let _code = code;
 
@@ -1561,7 +1582,7 @@ where
         &self,
         settings: Settings,
         bullets: &'a [Bullet],
-    ) -> Element<'a, Url, Theme, Renderer> {
+    ) -> Element<'a, MarkdownMessage, Theme, Renderer> {
         unordered_list(self, settings, bullets)
     }
 
@@ -1573,21 +1594,25 @@ where
         settings: Settings,
         start: u64,
         bullets: &'a [Bullet],
-    ) -> Element<'a, Url, Theme, Renderer> {
+    ) -> Element<'a, MarkdownMessage, Theme, Renderer> {
         ordered_list(self, settings, start, bullets)
     }
 
     /// Displays a quote.
     ///
     /// By default, it calls [`quote`].
-    fn quote(&self, settings: Settings, contents: &'a [Item]) -> Element<'a, Url, Theme, Renderer> {
+    fn quote(
+        &self,
+        settings: Settings,
+        contents: &'a [Item],
+    ) -> Element<'a, MarkdownMessage, Theme, Renderer> {
         quote(self, settings, contents)
     }
 
     /// Displays a rule.
     ///
     /// By default, it calls [`rule`](self::rule()).
-    fn rule(&self, _settings: Settings) -> Element<'a, Url, Theme, Renderer> {
+    fn rule(&self, _settings: Settings) -> Element<'a, MarkdownMessage, Theme, Renderer> {
         rule::<Theme, Renderer>()
     }
 
@@ -1599,7 +1624,7 @@ where
         settings: Settings,
         columns: &'a [Column],
         rows: &'a [Row],
-    ) -> Element<'a, Url, Theme, Renderer> {
+    ) -> Element<'a, MarkdownMessage, Theme, Renderer> {
         table(self, settings, columns, rows)
     }
 }
