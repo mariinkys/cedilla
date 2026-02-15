@@ -10,8 +10,8 @@
 
 <h3>A markdown text editor for the COSMIC™ desktop</h3>
 
-<!--<img src="./resources/screenshots/main-dark.png" width=350>
-<img src="./resources/screenshots/main-light.png" width=350>-->
+<img src="./resources/screenshots/main-gif-light.gif" width=650>
+<!--<img src="./resources/screenshots/main-light.png" width=350>-->
 
 <br><br>
 
@@ -19,6 +19,10 @@
    <img width='240' alt='Download on Flathub' src='https://flathub.org/api/badge?locale=en'/>
  </a>-->
  </div>
+
+## Note
+
+This is a WIP project that may or may not be released eventually.
 
 ## Install
 
