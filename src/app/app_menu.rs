@@ -24,6 +24,8 @@ pub enum MenuAction {
     NewFile,
     /// Save the current file
     SaveFile,
+    /// Toggle the preview for the current file
+    TogglePreview,
 }
 
 impl menu::action::MenuAction for MenuAction {
@@ -36,6 +38,7 @@ impl menu::action::MenuAction for MenuAction {
             MenuAction::OpenFile => Message::MenuAction(MenuAction::OpenFile),
             MenuAction::NewFile => Message::MenuAction(MenuAction::NewFile),
             MenuAction::SaveFile => Message::MenuAction(MenuAction::SaveFile),
+            MenuAction::TogglePreview => Message::MenuAction(MenuAction::TogglePreview),
         }
     }
 }

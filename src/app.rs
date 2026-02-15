@@ -5,7 +5,7 @@ use crate::app::context_page::ContextPage;
 use crate::app::core::utils::{self, CedillaToast};
 use crate::app::widgets::{markdown, sensor};
 use crate::config::{AppTheme, CedillaConfig};
-use crate::fl;
+use crate::{fl, icons};
 use cosmic::app::context_drawer;
 use cosmic::iced::{Alignment, Length, Subscription, highlighter};
 use cosmic::iced_widget::{center, column, row};
@@ -50,6 +50,7 @@ pub struct AppModel {
 }
 
 /// Represents the Application State
+#[allow(clippy::large_enum_variant)]
 enum State {
     Loading,
     Ready {
@@ -65,6 +66,8 @@ enum State {
         is_dirty: bool,
         /// Pane grid state
         panes: pane_grid::State<PaneContent>,
+        /// Controls if the preview is hidden or not
+        preview_state: PreviewState,
     },
 }
 
@@ -80,6 +83,12 @@ enum ImageState {
     Loading,
     Ready(widget::image::Handle),
     Failed,
+}
+
+/// State of the markdown preview in the app
+enum PreviewState {
+    Hidden,
+    Shown,
 }
 
 /// Messages emitted by the application and its widgets.
@@ -229,6 +238,24 @@ impl cosmic::Application for AppModel {
         vec![app_menu::menu_bar(&self.core, &self.key_binds)]
     }
 
+    /// Elements to pack at the end of the header bar.
+    fn header_end(&self) -> Vec<Element<'_, Self::Message>> {
+        let State::Ready { preview_state, .. } = &self.state else {
+            return vec![];
+        };
+
+        let preview_button = match preview_state {
+            PreviewState::Hidden => widget::button::icon(icons::get_handle("show-symbolic", 18))
+                .on_press(Message::MenuAction(MenuAction::TogglePreview))
+                .class(theme::Button::Icon),
+            PreviewState::Shown => widget::button::icon(icons::get_handle("hide-symbolic", 18))
+                .on_press(Message::MenuAction(MenuAction::TogglePreview))
+                .class(theme::Button::Icon),
+        };
+
+        vec![container(preview_button).into()]
+    }
+
     /// Display a context drawer if the context page is requested.
     fn context_drawer(&self) -> Option<context_drawer::ContextDrawer<'_, Self::Message>> {
         if !self.core.window.show_context {
@@ -252,6 +279,7 @@ impl cosmic::Application for AppModel {
                 items,
                 is_dirty,
                 panes,
+                preview_state,
             } => cedilla_main_view(
                 path,
                 editor_content,
@@ -259,6 +287,7 @@ impl cosmic::Application for AppModel {
                 items,
                 is_dirty,
                 panes,
+                preview_state,
             ),
         };
 
@@ -343,7 +372,7 @@ impl cosmic::Application for AppModel {
                 }
             },
             Message::MenuAction(action) => {
-                let State::Ready { .. } = &mut self.state else {
+                let State::Ready { preview_state, .. } = &mut self.state else {
                     return Task::none();
                 };
 
@@ -368,6 +397,13 @@ impl cosmic::Application for AppModel {
                     ),
                     MenuAction::NewFile => self.update(Message::NewFile),
                     MenuAction::SaveFile => self.update(Message::SaveFile),
+                    MenuAction::TogglePreview => {
+                        match preview_state {
+                            PreviewState::Hidden => *preview_state = PreviewState::Shown,
+                            PreviewState::Shown => *preview_state = PreviewState::Hidden,
+                        }
+                        Task::none()
+                    }
                 }
             }
             Message::Surface(a) => {
@@ -386,6 +422,7 @@ impl cosmic::Application for AppModel {
                     items: vec![],
                     is_dirty: true,
                     panes,
+                    preview_state: PreviewState::Shown,
                 };
                 Task::none()
             }
@@ -441,6 +478,7 @@ impl cosmic::Application for AppModel {
                         items: markdown::parse(content.as_ref()).collect(),
                         is_dirty: false,
                         panes,
+                        preview_state: PreviewState::Shown,
                     };
                     Task::none()
                 }
@@ -583,84 +621,108 @@ fn cedilla_main_view<'a>(
     items: &'a [markdown::Item],
     _is_dirty: &'a bool,
     panes: &'a pane_grid::State<PaneContent>,
+    preview_state: &'a PreviewState,
 ) -> Element<'a, Message> {
     let spacing = theme::active().cosmic().spacing;
 
-    let pane_grid = pane_grid::PaneGrid::new(panes, |_pane, content, _is_focused| {
-        let (title, icon_name) = match content {
-            PaneContent::Editor => (fl!("editor"), "text-editor-symbolic"),
-            PaneContent::Preview => (fl!("preview"), "view-paged-symbolic"),
-        };
+    let create_editor = || {
+        container(
+            text_editor(editor_content)
+                .highlight_with::<highlighter::Highlighter>(
+                    highlighter::Settings {
+                        theme: highlighter::Theme::InspiredGitHub,
+                        token: path
+                            .as_ref()
+                            .and_then(|path| path.extension()?.to_str())
+                            .unwrap_or("md")
+                            .to_string(),
+                    },
+                    |highlight, _theme| highlight.to_format(),
+                )
+                .on_action(Message::Edit)
+                .height(Length::Fill),
+        )
+        .padding([5, spacing.space_xxs])
+        .width(Length::Fill)
+        .height(Length::Fill)
+    };
 
-        let title_content = row![
+    let create_title = |icon_name: &str, title: String| {
+        row![
             widget::icon::from_name(icon_name).size(16),
             text(title).size(14),
         ]
         .spacing(spacing.space_xxs)
         .padding([5, spacing.space_xxs])
-        .align_y(Alignment::Center);
+        .align_y(Alignment::Center)
+    };
 
-        let pane_content: Element<'a, Message> = match content {
-            PaneContent::Editor => container(
-                text_editor(editor_content)
-                    .highlight_with::<highlighter::Highlighter>(
-                        highlighter::Settings {
-                            theme: highlighter::Theme::InspiredGitHub,
-                            token: path
-                                .as_ref()
-                                .and_then(|path| path.extension()?.to_str())
-                                .unwrap_or("md")
-                                .to_string(),
+    let main_content: Element<'a, Message> = if matches!(preview_state, PreviewState::Hidden) {
+        // Editor only view
+        container(
+            column![
+                container(create_title("text-editor-symbolic", fl!("editor")))
+                    .padding(spacing.space_xxs)
+                    .width(Length::Fill)
+                    .class(theme::Container::Card),
+                create_editor()
+            ]
+            .spacing(spacing.space_xxxs),
+        )
+        .width(Length::Fill)
+        .height(Length::Fill)
+        .class(theme::Container::Card)
+        .into()
+    } else {
+        // Pane grid with editor and preview
+        pane_grid::PaneGrid::new(panes, |_pane, content, _is_focused| {
+            let (title, icon_name) = match content {
+                PaneContent::Editor => (fl!("editor"), "text-editor-symbolic"),
+                PaneContent::Preview => (fl!("preview"), "view-paged-symbolic"),
+            };
+
+            let pane_content: Element<'a, Message> = match content {
+                PaneContent::Editor => create_editor().into(),
+                PaneContent::Preview => container(scrollable(
+                    markdown::view_with(
+                        items,
+                        markdown::Settings::default(),
+                        &MarkdownViewer {
+                            images: markdown_images,
                         },
-                        |highlight, _theme| highlight.to_format(),
                     )
-                    .on_action(Message::Edit)
-                    .height(Length::Fill),
-            )
-            .padding([5, spacing.space_xxs])
-            .width(Length::Fill)
-            .height(Length::Fill)
-            .into(),
-            PaneContent::Preview => container(scrollable(
-                markdown::view_with(
-                    items,
-                    markdown::Settings::default(),
-                    &MarkdownViewer {
-                        images: markdown_images,
-                    },
-                )
-                .map(|m| match m {
-                    markdown::MarkdownMessage::LinkClicked(url) => {
-                        Message::LaunchUrl(url.to_string())
-                    }
-                    markdown::MarkdownMessage::ImageShown(url) => Message::ImageShown(url),
-                }),
-            ))
-            .padding(spacing.space_xxs)
-            .width(Length::Fill)
-            .height(Length::Fill)
-            .into(),
-        };
+                    .map(|m| match m {
+                        markdown::MarkdownMessage::LinkClicked(url) => {
+                            Message::LaunchUrl(url.to_string())
+                        }
+                        markdown::MarkdownMessage::ImageShown(url) => Message::ImageShown(url),
+                    }),
+                ))
+                .padding(spacing.space_xxs)
+                .width(Length::Fill)
+                .height(Length::Fill)
+                .into(),
+            };
 
-        pane_grid::Content::new(pane_content)
-            .title_bar(pane_grid::TitleBar::new(title_content))
-            .class(theme::Container::Card)
-    })
-    .on_drag(Message::PaneDragged)
-    .on_resize(10, Message::PaneResized)
-    .spacing(spacing.space_xxs);
+            pane_grid::Content::new(pane_content)
+                .title_bar(pane_grid::TitleBar::new(create_title(icon_name, title)))
+                .class(theme::Container::Card)
+        })
+        .on_drag(Message::PaneDragged)
+        .on_resize(10, Message::PaneResized)
+        .spacing(spacing.space_xxs)
+        .into()
+    };
 
     let status_bar = {
         let file_path = match path.as_deref().and_then(Path::to_str) {
             Some(path) => text(path).size(12),
             None => text(fl!("new-file")).size(12),
         };
-
         let position = {
             let (line, column) = editor_content.cursor_position();
             text(format!("{}:{}", line + 1, column + 1)).size(12)
         };
-
         container(
             row![file_path, Space::with_width(Length::Fill), position]
                 .padding(spacing.space_xxs)
@@ -670,7 +732,7 @@ fn cedilla_main_view<'a>(
         .class(theme::Container::Card)
     };
 
-    container(column![pane_grid, status_bar].spacing(spacing.space_xxxs))
+    container(column![main_content, status_bar].spacing(spacing.space_xxxs))
         .padding(spacing.space_xxs)
         .width(Length::Fill)
         .height(Length::Fill)

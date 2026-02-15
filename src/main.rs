@@ -1,11 +1,13 @@
 // SPDX-License-Identifier: GPL-3.0
 
 use crate::flags::flags;
+use std::sync::Mutex;
 
 mod app;
 mod config;
 mod flags;
 mod i18n;
+mod icons;
 
 fn main() -> cosmic::iced::Result {
     // Get the system's preferred languages.
@@ -22,6 +24,9 @@ fn main() -> cosmic::iced::Result {
                 .min_width(360.0),
         )
         .size(cosmic::iced::Size::new(1200.0, 800.0));
+
+    // Init the icon cache
+    icons::ICON_CACHE.get_or_init(|| Mutex::new(icons::IconCache::new()));
 
     // Starts the application's event loop with `()` as the application's flags.
     cosmic::app::run::<app::AppModel>(settings, flags())
