@@ -1,6 +1,6 @@
 #![allow(dead_code)]
 #![allow(clippy::type_complexity)]
-// This is an adapted version of the official iced markdown widget: https://github.com/iced-rs/iced/blob/master/widget/src/texteditor.rs
+// This is an adapted version of the official iced markdown widget: https://github.com/iced-rs/iced/blob/master/widget/src/text_editor.rs
 // it has been modified to work with the current version of libcosmic, original code by @hecrj
 
 //! Text editors display a multi-line text input for text editing.
