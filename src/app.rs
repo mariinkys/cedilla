@@ -621,24 +621,21 @@ fn cedilla_main_view<'a>(
             .width(Length::Fill)
             .height(Length::Fill)
             .into(),
-            PaneContent::Preview => container(
-                scrollable(
-                    markdown::view_with(
-                        items,
-                        markdown::Settings::default(),
-                        &MarkdownViewer {
-                            images: markdown_images,
-                        },
-                    )
-                    .map(|m| match m {
-                        markdown::MarkdownMessage::LinkClicked(url) => {
-                            Message::LaunchUrl(url.to_string())
-                        }
-                        markdown::MarkdownMessage::ImageShown(url) => Message::ImageShown(url),
-                    }),
+            PaneContent::Preview => container(scrollable(
+                markdown::view_with(
+                    items,
+                    markdown::Settings::default(),
+                    &MarkdownViewer {
+                        images: markdown_images,
+                    },
                 )
-                .spacing(spacing.space_xxs),
-            )
+                .map(|m| match m {
+                    markdown::MarkdownMessage::LinkClicked(url) => {
+                        Message::LaunchUrl(url.to_string())
+                    }
+                    markdown::MarkdownMessage::ImageShown(url) => Message::ImageShown(url),
+                }),
+            ))
             .padding(spacing.space_xxs)
             .width(Length::Fill)
             .height(Length::Fill)
