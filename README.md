@@ -3,15 +3,15 @@
 <img src="./resources/icons/hicolor/scalable/apps/icon.svg" width="150" />
 <h1 align="center">Cedilla</h1>
 
-![Flathub Version](https://img.shields.io/flathub/v/dev.mariinkys.Cedilla)
+<!--![Flathub Version](https://img.shields.io/flathub/v/dev.mariinkys.Cedilla)
 ![Flathub Downloads](https://img.shields.io/flathub/downloads/dev.mariinkys.Cedilla)
 ![GitHub License](https://img.shields.io/github/license/mariinkys/cedilla)
-![GitHub Repo stars](https://img.shields.io/github/stars/mariinkys/cedilla)
+![GitHub Repo stars](https://img.shields.io/github/stars/mariinkys/cedilla)-->
 
 <h3>A markdown text editor for the COSMIC™ desktop</h3>
 
-<img src="./resources/screenshots/main-dark.png" width=350>
-<img src="./resources/screenshots/main-light.png" width=350>
+<!--<img src="./resources/screenshots/main-dark.png" width=350>
+<img src="./resources/screenshots/main-light.png" width=350>-->
 
 <br><br>
 
