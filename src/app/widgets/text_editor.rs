@@ -669,18 +669,6 @@ where
             Update::Release => {
                 state.drag_click = None;
             }
-            Update::Scroll(lines) => {
-                let bounds = self.content.0.borrow().editor.bounds();
-
-                if bounds.height >= i32::MAX as f32 {
-                    return event::Status::Ignored;
-                }
-
-                shell.publish(on_edit(Action::Scroll {
-                    //TODO: what is the correct multiplier here?
-                    pixels: lines * 4.0,
-                }));
-            }
             Update::Binding(binding) => {
                 fn apply_binding<H: text::Highlighter, R: text::Renderer, Message>(
                     binding: Binding<Message>,
@@ -1059,7 +1047,6 @@ enum Update<Message> {
     Click(mouse::Click),
     Drag(Point),
     Release,
-    Scroll(f32),
     Binding(Binding<Message>),
 }
 
@@ -1104,18 +1091,6 @@ impl<Message> Update<Message> {
                     }
                     _ => None,
                 },
-                mouse::Event::WheelScrolled { delta } if cursor.is_over(bounds) => {
-                    Some(Update::Scroll(match delta {
-                        mouse::ScrollDelta::Lines { y, .. } => {
-                            if y.abs() > 0.0 {
-                                y.signum() * -(y.abs() * 4.0).max(1.0)
-                            } else {
-                                0.0
-                            }
-                        }
-                        mouse::ScrollDelta::Pixels { y, .. } => -y / 4.0,
-                    }))
-                }
                 _ => None,
             },
             Event::Keyboard(keyboard::Event::KeyPressed {
