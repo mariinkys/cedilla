@@ -659,7 +659,7 @@ fn cedilla_main_view<'a>(
     editor_content: &'a text_editor::Content,
     markdown_images: &'a HashMap<url::Url, ImageState>,
     items: &'a [markdown::Item],
-    _is_dirty: &'a bool,
+    is_dirty: &'a bool,
     panes: &'a pane_grid::State<PaneContent>,
     preview_state: &'a PreviewState,
 ) -> Element<'a, Message> {
@@ -761,14 +761,27 @@ fn cedilla_main_view<'a>(
             Some(path) => text(path).size(12),
             None => text(fl!("new-file")).size(12),
         };
+
+        let dirty_indicator = if *is_dirty {
+            text("•").size(12)
+        } else {
+            text("").size(12)
+        };
+
         let position = {
             let (line, column) = editor_content.cursor_position();
             text(format!("{}:{}", line + 1, column + 1)).size(12)
         };
+
         container(
-            row![file_path, Space::with_width(Length::Fill), position]
-                .padding(spacing.space_xxs)
-                .spacing(spacing.space_xxs),
+            row![
+                file_path,
+                dirty_indicator,
+                Space::with_width(Length::Fill),
+                position
+            ]
+            .padding(spacing.space_xxs)
+            .spacing(spacing.space_xxs),
         )
         .width(Length::Fill)
         .class(theme::Container::Card)
