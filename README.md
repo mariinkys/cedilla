@@ -24,6 +24,18 @@
 
 This is a WIP project that may or may not be released eventually.
 
+## TODO/Ideas
+
+- [X] Support tables
+- [X] Support rules 
+- [X] Config support 
+- [ ] Add vault/project sidebar
+- [ ] Helper headerbar with options to format text 
+- [ ] Optional scrollbar sync
+- [ ] Support html 
+- [ ] PDF Exporting
+
+
 ## Install
 
 To install your COSMIC application, you will need [just](https://github.com/casey/just), if you're on Pop!\_OS, you can install it with the following command:
