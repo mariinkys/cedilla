@@ -3,6 +3,7 @@
 pub mod files;
 pub mod images;
 pub mod markdown;
+pub mod project;
 mod toast;
 
 pub use markdown::SelectionAction;

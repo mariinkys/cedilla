@@ -52,11 +52,13 @@ pub async fn open_markdown_file_picker() -> Option<String> {
 }
 
 /// Open a system dialog to select where to save a markdown file, returns the selected file (if any)
-pub async fn open_markdown_file_saver() -> Option<String> {
+pub async fn open_markdown_file_saver(vault_path: String) -> Option<String> {
     let result = SelectedFiles::save_file()
         .title("Save File")
         .accept_label("Save")
         .modal(true)
+        .current_folder(vault_path)
+        .unwrap_or_default()
         .filter(
             FileFilter::new("Markdown Files")
                 .glob("*.md")

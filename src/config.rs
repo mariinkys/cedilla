@@ -13,11 +13,29 @@ use crate::fl;
 const APP_ID: &str = "dev.mariinkys.Cedilla";
 const CONFIG_VERSION: u64 = 1;
 
-#[derive(Debug, Default, Clone, CosmicConfigEntry, Eq, PartialEq)]
+#[derive(Debug, Clone, CosmicConfigEntry, Eq, PartialEq)]
 pub struct CedillaConfig {
     pub app_theme: AppTheme,
+    pub vault_path: String,
     pub show_helper_header_bar: ShowState,
     pub show_status_bar: ShowState,
+}
+
+impl Default for CedillaConfig {
+    fn default() -> Self {
+        let vault_path = dirs::data_dir().unwrap().join(APP_ID).join("vault");
+
+        if !vault_path.exists() {
+            std::fs::create_dir_all(&vault_path).expect("Failed to create vault directory");
+        }
+
+        Self {
+            app_theme: AppTheme::default(),
+            vault_path: vault_path.to_string_lossy().to_string(),
+            show_helper_header_bar: ShowState::default(),
+            show_status_bar: ShowState::default(),
+        }
+    }
 }
 
 impl CedillaConfig {
