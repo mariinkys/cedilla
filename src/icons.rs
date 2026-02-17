@@ -39,6 +39,17 @@ impl IconCache {
         bundle!("show-symbolic", 18);
         bundle!("hide-symbolic", 18);
 
+        bundle!("helperbar/bold-symbolic", 18);
+        bundle!("helperbar/bulleted-list-symbolic", 18);
+        bundle!("helperbar/checked-list-symbolic", 18);
+        bundle!("helperbar/code-symbolic", 18);
+        bundle!("helperbar/heading-symbolic", 18);
+        bundle!("helperbar/image-symbolic", 18);
+        bundle!("helperbar/italic-symbolic", 18);
+        bundle!("helperbar/link-symbolic", 18);
+        bundle!("helperbar/numbered-list-symbolic", 18);
+        bundle!("helperbar/rule-symbolic", 18);
+
         Self { cache }
     }
 }

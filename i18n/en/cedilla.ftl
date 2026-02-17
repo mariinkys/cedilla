@@ -12,6 +12,12 @@ match-desktop = Match desktop
 dark = Dark
 light = Light
 
+<#-- Settings Context Page -->
+general = General
+help-bar = Editor Help Bar
+show = Show
+hide = Hide
+
 <#-- Application MenuBar -->
 file = File
 open-file = Open File

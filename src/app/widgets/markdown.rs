@@ -1,5 +1,4 @@
 #![allow(dead_code)]
-
 // This is an adapted version of the official iced markdown widget: https://github.com/iced-rs/iced/blob/master/widget/src/markdown.rs
 // it has been modified to work with the current version of libcosmic, original code by @hecrj
 
@@ -76,14 +75,6 @@ pub use cosmic::iced_core::text::Highlight;
 pub use pulldown_cmark::HeadingLevel;
 pub use url::Url;
 
-/// A bunch of Markdown that has been parsed.
-#[derive(Debug, Default)]
-pub struct Content {
-    items: Vec<Item>,
-    incomplete: HashMap<usize, Section>,
-    state: State,
-}
-
 /// Messages that can be emitted by the markdown viewer
 #[derive(Debug, Clone)]
 pub enum MarkdownMessage {
@@ -91,6 +82,14 @@ pub enum MarkdownMessage {
     LinkClicked(Url),
     /// An image became visible and should be loaded
     ImageShown(Url),
+}
+
+/// A bunch of Markdown that has been parsed.
+#[derive(Debug, Default)]
+pub struct Content {
+    items: Vec<Item>,
+    incomplete: HashMap<usize, Section>,
+    state: State,
 }
 
 #[derive(Debug)]

@@ -4,7 +4,7 @@ use crate::app::app_menu::MenuAction;
 use crate::app::context_page::ContextPage;
 use crate::app::core::utils::{self, CedillaToast};
 use crate::app::widgets::{TextEditor, markdown, sensor, text_editor};
-use crate::config::{AppTheme, CedillaConfig};
+use crate::config::{AppTheme, CedillaConfig, ConfigInput, ShowState};
 use crate::key_binds::key_binds;
 use crate::{fl, icons};
 use cosmic::app::context_drawer;
@@ -14,7 +14,7 @@ use cosmic::iced_widget::{center, column, row, tooltip};
 use cosmic::widget::menu::Action;
 use cosmic::widget::{self, about::About, menu};
 use cosmic::widget::{
-    Space, ToastId, Toasts, container, pane_grid, responsive, scrollable, text, toaster,
+    Space, ToastId, Toasts, button, container, pane_grid, responsive, scrollable, text, toaster,
 };
 use cosmic::{prelude::*, surface, theme};
 use std::collections::HashMap;
@@ -109,8 +109,6 @@ pub enum Message {
     ToggleContextPage(ContextPage),
     /// Update the application config
     UpdateConfig(CedillaConfig),
-    /// Update the application theme
-    UpdateTheme(usize),
     /// Callback after clicking something in the app menu
     MenuAction(app_menu::MenuAction),
     /// Needed for responsive menu bar
@@ -139,6 +137,11 @@ pub enum Message {
     ImageShown(markdown::Url),
     /// Callback after downloading/loading an image
     ImageLoaded(markdown::Url, Result<widget::image::Handle, String>),
+    /// Apply formatting to selected text
+    ApplyFormatting(utils::SelectionAction),
+
+    /// Callback after input on the Config [`ContextPage`]
+    ConfigInput(ConfigInput),
 }
 
 struct MarkdownViewer<'a> {
@@ -294,6 +297,7 @@ impl cosmic::Application for AppModel {
                 panes,
                 preview_state,
             } => cedilla_main_view(
+                &self.config,
                 path,
                 editor_content,
                 markdown_images,
@@ -370,26 +374,6 @@ impl cosmic::Application for AppModel {
             }
             Message::UpdateConfig(config) => {
                 self.config = config;
-                Task::none()
-            }
-            Message::UpdateTheme(index) => {
-                let app_theme = match index {
-                    1 => AppTheme::Dark,
-                    2 => AppTheme::Light,
-                    _ => AppTheme::System,
-                };
-
-                if let Some(handler) = &self.config_handler {
-                    if let Err(err) = self.config.set_app_theme(handler, app_theme) {
-                        eprintln!("{err}");
-                        // even if it fails we update the config (it won't get saved after restart)
-                        let mut old_config = self.config.clone();
-                        old_config.app_theme = app_theme;
-                        self.config = old_config;
-                    }
-
-                    return cosmic::command::set_theme(self.config.app_theme.theme());
-                }
                 Task::none()
             }
             Message::LaunchUrl(url) => match open::that_detached(&url) {
@@ -609,6 +593,45 @@ impl cosmic::Application for AppModel {
 
                 Task::none()
             }
+            Message::ApplyFormatting(action) => self.apply_formatting_to_selection(action),
+
+            #[allow(clippy::collapsible_if)]
+            Message::ConfigInput(input) => match input {
+                ConfigInput::UpdateTheme(index) => {
+                    let app_theme = match index {
+                        1 => AppTheme::Dark,
+                        2 => AppTheme::Light,
+                        _ => AppTheme::System,
+                    };
+
+                    if let Some(handler) = &self.config_handler {
+                        if let Err(err) = self.config.set_app_theme(handler, app_theme) {
+                            eprintln!("{err}");
+                            // even if it fails we update the config (it won't get saved after restart)
+                            let mut old_config = self.config.clone();
+                            old_config.app_theme = app_theme;
+                            self.config = old_config;
+                        }
+
+                        return cosmic::command::set_theme(self.config.app_theme.theme());
+                    }
+                    Task::none()
+                }
+                ConfigInput::UpdateHelperHeaderBarShowState(show_state) => {
+                    if let Some(handler) = &self.config_handler {
+                        if let Err(err) =
+                            self.config.set_show_helper_header_bar(handler, show_state)
+                        {
+                            eprintln!("{err}");
+                            // even if it fails we update the config (it won't get saved after restart)
+                            let mut old_config = self.config.clone();
+                            old_config.show_helper_header_bar = show_state;
+                            self.config = old_config;
+                        }
+                    }
+                    Task::none()
+                }
+            },
         }
     }
 }
@@ -640,7 +663,21 @@ impl AppModel {
                     widget::settings::item::builder(fl!("theme")).control(widget::dropdown(
                         &self.app_themes,
                         Some(app_theme_selected),
-                        Message::UpdateTheme,
+                        |t| Message::ConfigInput(ConfigInput::UpdateTheme(t)),
+                    )),
+                )
+                .into(),
+            widget::settings::section()
+                .title(fl!("general"))
+                .add(
+                    widget::settings::item::builder(fl!("help-bar")).control(widget::dropdown(
+                        ShowState::all_labels(),
+                        Some(self.config.show_helper_header_bar.to_index()),
+                        |index| {
+                            Message::ConfigInput(ConfigInput::UpdateHelperHeaderBarShowState(
+                                ShowState::from_index(index),
+                            ))
+                        },
                     )),
                 )
                 .into(),
@@ -654,7 +691,9 @@ impl AppModel {
 //
 
 /// View of the header of this screen
+#[allow(clippy::too_many_arguments)]
 fn cedilla_main_view<'a>(
+    app_config: &'a CedillaConfig,
     path: &'a Option<PathBuf>,
     editor_content: &'a text_editor::Content,
     markdown_images: &'a HashMap<url::Url, ImageState>,
@@ -787,7 +826,49 @@ fn cedilla_main_view<'a>(
         .class(theme::Container::Card)
     };
 
-    container(column![main_content, status_bar].spacing(spacing.space_xxxs))
+    let helper_header_bar = {
+        container(
+            row![
+                button::icon(icons::get_handle("helperbar/bold-symbolic", 18))
+                    .on_press(Message::ApplyFormatting(utils::SelectionAction::Bold)),
+                button::icon(icons::get_handle("helperbar/italic-symbolic", 18))
+                    .on_press(Message::ApplyFormatting(utils::SelectionAction::Italic)),
+                Space::new(18., 0.),
+                button::icon(icons::get_handle("helperbar/link-symbolic", 18))
+                    .on_press(Message::ApplyFormatting(utils::SelectionAction::Hyperlink)),
+                button::icon(icons::get_handle("helperbar/code-symbolic", 18))
+                    .on_press(Message::ApplyFormatting(utils::SelectionAction::Code)),
+                button::icon(icons::get_handle("helperbar/image-symbolic", 18))
+                    .on_press(Message::ApplyFormatting(utils::SelectionAction::Image)),
+                Space::new(18., 0.),
+                button::icon(icons::get_handle("helperbar/bulleted-list-symbolic", 18)).on_press(
+                    Message::ApplyFormatting(utils::SelectionAction::BulletedList)
+                ),
+                button::icon(icons::get_handle("helperbar/numbered-list-symbolic", 18)).on_press(
+                    Message::ApplyFormatting(utils::SelectionAction::NumberedList)
+                ),
+                button::icon(icons::get_handle("helperbar/checked-list-symbolic", 18)).on_press(
+                    Message::ApplyFormatting(utils::SelectionAction::CheckboxList)
+                ),
+                button::icon(icons::get_handle("helperbar/heading-symbolic", 18))
+                    .on_press(Message::ApplyFormatting(utils::SelectionAction::Heading1)),
+                button::icon(icons::get_handle("helperbar/rule-symbolic", 18))
+                    .on_press(Message::ApplyFormatting(utils::SelectionAction::Rule)),
+            ]
+            .padding(spacing.space_xxs)
+            .spacing(spacing.space_xxs),
+        )
+        .width(Length::Fill)
+        .class(theme::Container::Card)
+    };
+
+    let content_column = match app_config.show_helper_header_bar {
+        ShowState::Show => column![helper_header_bar, main_content, status_bar],
+        ShowState::Hide => column![main_content, status_bar],
+    }
+    .spacing(spacing.space_xxxs);
+
+    container(content_column)
         .padding(spacing.space_xxs)
         .width(Length::Fill)
         .height(Length::Fill)
