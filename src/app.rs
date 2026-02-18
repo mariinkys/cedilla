@@ -10,7 +10,6 @@ use crate::config::{AppTheme, CedillaConfig, ConfigInput, ShowState};
 use crate::key_binds::key_binds;
 use crate::{fl, icons};
 use cosmic::app::context_drawer;
-use cosmic::dialog::ashpd::zvariant::NoneValue;
 use cosmic::iced::{Alignment, Event, Length, Subscription, highlighter};
 use cosmic::iced_core::keyboard::{Key, Modifiers};
 use cosmic::iced_widget::{center, column, row, tooltip};
@@ -21,6 +20,7 @@ use cosmic::widget::{
     segmented_button, text, toaster,
 };
 use cosmic::{prelude::*, surface, theme};
+use slotmap::Key as SlotMapKey;
 use std::collections::{HashMap, VecDeque};
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
@@ -264,7 +264,7 @@ impl cosmic::Application for AppModel {
             toasts: Toasts::new(Message::CloseToast),
             core,
             nav_model: nav_bar::Model::builder().build(),
-            nav_bar_context_id: segmented_button::Entity::null_value(),
+            nav_bar_context_id: segmented_button::Entity::null(),
             context_page: ContextPage::default(),
             dialog_pages: VecDeque::default(),
             dialog_state: DialogState::default(),

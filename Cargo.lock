@@ -924,6 +924,7 @@ dependencies = [
  "reqwest",
  "rust-embed",
  "serde",
+ "slotmap",
  "tokio",
  "url",
 ]
