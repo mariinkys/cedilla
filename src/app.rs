@@ -525,7 +525,8 @@ impl cosmic::Application for AppModel {
                             None => cosmic::action::none(),
                         },
                     ),
-                    MenuAction::NewFile => self.update(Message::NewVaultFile), // TODO: Different actions for new file and new vault file
+                    MenuAction::NewFile => self.update(Message::NewFile),
+                    MenuAction::NewVaultFile => self.update(Message::NewVaultFile),
                     MenuAction::SaveFile => self.update(Message::SaveFile),
                     MenuAction::TogglePreview => {
                         match preview_state {

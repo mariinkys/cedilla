@@ -23,6 +23,7 @@ hide = Hide
 file = File
 open-file = Open File
 new-file = New File
+new-vault-file = New Vault File
 save-file = Save File
 
 edit = Edit
