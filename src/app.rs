@@ -4,6 +4,7 @@ use crate::app::app_menu::MenuAction;
 use crate::app::context_page::ContextPage;
 use crate::app::core::utils::project::ProjectNode;
 use crate::app::core::utils::{self, CedillaToast};
+use crate::app::dialogs::{DialogPage, DialogState};
 use crate::app::widgets::{TextEditor, markdown, sensor, text_editor};
 use crate::config::{AppTheme, CedillaConfig, ConfigInput, ShowState};
 use crate::key_binds::key_binds;
@@ -19,7 +20,7 @@ use cosmic::widget::{
     segmented_button, text, toaster,
 };
 use cosmic::{prelude::*, surface, theme};
-use std::collections::HashMap;
+use std::collections::{HashMap, VecDeque};
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
 use std::time::Duration;
@@ -27,6 +28,7 @@ use std::time::Duration;
 pub mod app_menu;
 mod context_page;
 mod core;
+mod dialogs;
 mod widgets;
 
 const REPOSITORY: &str = env!("CARGO_PKG_REPOSITORY");
@@ -40,6 +42,10 @@ pub struct AppModel {
     core: cosmic::Core,
     /// Application navbar
     nav_model: segmented_button::SingleSelectModel,
+    /// Dialog Pages of the Application
+    dialog_pages: VecDeque<DialogPage>,
+    /// Holds the state of the application dialogs
+    dialog_state: DialogState,
     /// Display a context drawer with the designated page if defined.
     context_page: ContextPage,
     /// The about page for this app.
@@ -127,11 +133,13 @@ pub enum Message {
     Key(Modifiers, Key),
     /// Updates the current state of keyboard modifiers
     Modifiers(Modifiers),
+    /// Asks to execute various actions related to the application dialogs
+    DialogAction(dialogs::DialogAction),
 
     /// Creates a new empty file (no path)
     NewFile,
     /// Creates a new markdown file in the vault
-    NewVaultFile,
+    NewVaultFile(String),
     /// Save the current file
     SaveFile,
     /// Callback after opening a new file
@@ -235,6 +243,8 @@ impl cosmic::Application for AppModel {
             core,
             nav_model: nav_bar::Model::builder().build(),
             context_page: ContextPage::default(),
+            dialog_pages: VecDeque::default(),
+            dialog_state: DialogState::default(),
             about,
             key_binds: key_binds(),
             modifiers: Modifiers::empty(),
@@ -389,6 +399,12 @@ impl cosmic::Application for AppModel {
         }
     }
 
+    /// Display a dialog if requested.
+    fn dialog(&self) -> Option<Element<'_, Message>> {
+        let dialog_page = self.dialog_pages.front()?;
+        dialog_page.display(&self.dialog_state)
+    }
+
     /// Display a context drawer if the context page is requested.
     fn context_drawer(&self) -> Option<context_drawer::ContextDrawer<'_, Self::Message>> {
         if !self.core.window.show_context {
@@ -526,7 +542,9 @@ impl cosmic::Application for AppModel {
                         },
                     ),
                     MenuAction::NewFile => self.update(Message::NewFile),
-                    MenuAction::NewVaultFile => self.update(Message::NewVaultFile),
+                    MenuAction::NewVaultFile => self.update(Message::DialogAction(
+                        dialogs::DialogAction::OpenNewVaultFileDialog,
+                    )),
                     MenuAction::SaveFile => self.update(Message::SaveFile),
                     MenuAction::TogglePreview => {
                         match preview_state {
@@ -554,6 +572,13 @@ impl cosmic::Application for AppModel {
                 self.modifiers = modifiers;
                 Task::none()
             }
+            Message::DialogAction(action) => {
+                let State::Ready { .. } = &mut self.state else {
+                    return Task::none();
+                };
+
+                action.execute(&mut self.dialog_pages, &self.dialog_state)
+            }
 
             Message::NewFile => {
                 // Create initial pane configuration with editor on left, preview on right
@@ -573,18 +598,18 @@ impl cosmic::Application for AppModel {
                 };
                 Task::none()
             }
-            Message::NewVaultFile => {
+            Message::NewVaultFile(file_name) => {
                 let dir = self.selected_directory();
 
                 // find a name that doesn't already exist (TODO: Let the user input a name on a dialog or smth)
                 let file_path = {
-                    let base = dir.join("untitled.md");
+                    let base = dir.join(format!("{}.md", file_name));
                     if !base.exists() {
                         base
                     } else {
                         let mut i = 1;
                         loop {
-                            let candidate = dir.join(format!("untitled-{}.md", i));
+                            let candidate = dir.join(format!("{}-{}.md", file_name, i));
                             if !candidate.exists() {
                                 break candidate;
                             }

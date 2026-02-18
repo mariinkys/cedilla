@@ -5,6 +5,10 @@ view = View
 loading = Loading
 support = Support
 
+create = Create
+cancel = Cancel
+file-name = File Name
+
 <#-- Appearance -->
 appearance = Appearance
 theme = Theme
