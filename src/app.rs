@@ -10,6 +10,7 @@ use crate::config::{AppTheme, CedillaConfig, ConfigInput, ShowState};
 use crate::key_binds::key_binds;
 use crate::{fl, icons};
 use cosmic::app::context_drawer;
+use cosmic::dialog::ashpd::zvariant::NoneValue;
 use cosmic::iced::{Alignment, Event, Length, Subscription, highlighter};
 use cosmic::iced_core::keyboard::{Key, Modifiers};
 use cosmic::iced_widget::{center, column, row, tooltip};
@@ -42,6 +43,8 @@ pub struct AppModel {
     core: cosmic::Core,
     /// Application navbar
     nav_model: segmented_button::SingleSelectModel,
+    /// Needed for navbar context menu func
+    nav_bar_context_id: segmented_button::Entity,
     /// Dialog Pages of the Application
     dialog_pages: VecDeque<DialogPage>,
     /// Holds the state of the application dialogs
@@ -136,6 +139,11 @@ pub enum Message {
     /// Asks to execute various actions related to the application dialogs
     DialogAction(dialogs::DialogAction),
 
+    /// Right click on a NavBar Item
+    NavBarContext(segmented_button::Entity),
+    /// Fired when a menu item is chosen
+    NavMenuAction(NavMenuAction),
+
     /// Creates a new empty file (no path)
     NewFile,
     /// Creates a new markdown file in the vault
@@ -201,6 +209,18 @@ impl<'a> markdown::Viewer<'a, cosmic::theme::Theme, cosmic::iced_widget::Rendere
     }
 }
 
+#[derive(Copy, Clone, Debug, Eq, PartialEq)]
+pub enum NavMenuAction {
+    DeleteFile(segmented_button::Entity),
+}
+
+impl cosmic::widget::menu::Action for NavMenuAction {
+    type Message = cosmic::Action<Message>;
+    fn message(&self) -> Self::Message {
+        cosmic::Action::App(Message::NavMenuAction(*self))
+    }
+}
+
 /// Create a COSMIC application from the app model
 impl cosmic::Application for AppModel {
     /// The async executor that will be used to run your application's commands.
@@ -244,6 +264,7 @@ impl cosmic::Application for AppModel {
             toasts: Toasts::new(Message::CloseToast),
             core,
             nav_model: nav_bar::Model::builder().build(),
+            nav_bar_context_id: segmented_button::Entity::null_value(),
             context_page: ContextPage::default(),
             dialog_pages: VecDeque::default(),
             dialog_state: DialogState::default(),
@@ -306,7 +327,7 @@ impl cosmic::Application for AppModel {
         vec![container(preview_button).into()]
     }
 
-    fn nav_bar(&self) -> Option<Element<'_, cosmic::action::Action<Self::Message>>> {
+    fn nav_bar(&self) -> Option<Element<'_, cosmic::action::Action<Message>>> {
         if !self.core().nav_bar_active() {
             return None;
         }
@@ -328,6 +349,8 @@ impl cosmic::Application for AppModel {
             .button_padding([space_s, space_xxxs, space_s, space_xxxs])
             .button_spacing(space_xxxs)
             .on_activate(|entity| cosmic::action::cosmic(cosmic::app::Action::NavBar(entity)))
+            .on_context(|entity| cosmic::Action::App(Message::NavBarContext(entity)))
+            .context_menu(self.nav_context_menu(self.nav_bar_context_id))
             .spacing(space_none)
             .style(theme::SegmentedButton::FileNav)
             .apply(widget::container)
@@ -351,7 +374,43 @@ impl cosmic::Application for AppModel {
         Some(&self.nav_model)
     }
 
-    fn on_nav_select(&mut self, id: nav_bar::Id) -> Task<cosmic::Action<Self::Message>> {
+    fn nav_context_menu(
+        &self,
+        entity: widget::nav_bar::Id,
+    ) -> Option<Vec<widget::menu::Tree<cosmic::Action<Message>>>> {
+        let node = self.nav_model.data::<ProjectNode>(entity)?;
+
+        let mut items = Vec::with_capacity(1);
+
+        match node {
+            ProjectNode::File { .. } => {
+                items.push(cosmic::widget::menu::Item::Button(
+                    "Delete".to_string(),
+                    None,
+                    NavMenuAction::DeleteFile(entity),
+                ));
+            }
+            ProjectNode::Folder { .. } => {
+                items.push(cosmic::widget::menu::Item::Button(
+                    "Delete".to_string(),
+                    None,
+                    NavMenuAction::DeleteFile(entity),
+                ));
+            }
+        }
+
+        Some(cosmic::widget::menu::items(
+            &std::collections::HashMap::new(),
+            items,
+        ))
+    }
+
+    fn on_nav_context(&mut self, id: nav_bar::Id) -> Task<cosmic::Action<Message>> {
+        self.nav_bar_context_id = id;
+        Task::none()
+    }
+
+    fn on_nav_select(&mut self, id: nav_bar::Id) -> Task<cosmic::Action<Message>> {
         let node_opt = match self.nav_model.data_mut::<ProjectNode>(id) {
             Some(node) => {
                 if let ProjectNode::Folder { open, .. } = node {
@@ -584,6 +643,15 @@ impl cosmic::Application for AppModel {
 
                 action.execute(&mut self.dialog_pages, &self.dialog_state)
             }
+
+            Message::NavBarContext(entity) => {
+                eprintln!("NavBarContext fired: {:?}", entity);
+                self.nav_bar_context_id = entity;
+                Task::none()
+            }
+            Message::NavMenuAction(action) => match action {
+                NavMenuAction::DeleteFile(entity) => todo!(),
+            },
 
             Message::NewFile => {
                 // Create initial pane configuration with editor on left, preview on right
