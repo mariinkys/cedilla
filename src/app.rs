@@ -162,6 +162,8 @@ pub enum Message {
     DeleteNode(cosmic::widget::segmented_button::Entity),
     /// Renames the given node entity of the navbar folder or file
     RenameNode(cosmic::widget::segmented_button::Entity, String),
+    /// Move one node (to another one)
+    MoveNode(cosmic::widget::segmented_button::Entity, PathBuf),
 
     /// Pane grid resized callback
     PaneResized(pane_grid::ResizeEvent),
@@ -214,9 +216,11 @@ impl<'a> markdown::Viewer<'a, cosmic::theme::Theme, cosmic::iced_widget::Rendere
 }
 
 #[derive(Copy, Clone, Debug, Eq, PartialEq)]
+#[allow(clippy::enum_variant_names)]
 pub enum NavMenuAction {
     DeleteNode(segmented_button::Entity),
     RenameNode(segmented_button::Entity),
+    MoveNode(segmented_button::Entity),
 }
 
 impl cosmic::widget::menu::Action for NavMenuAction {
@@ -408,6 +412,11 @@ impl cosmic::Application for AppModel {
                     None,
                     NavMenuAction::RenameNode(entity),
                 ));
+                items.push(cosmic::widget::menu::Item::Button(
+                    fl!("move-to"),
+                    None,
+                    NavMenuAction::MoveNode(entity),
+                ));
             }
             ProjectNode::Folder { .. } => {
                 items.push(cosmic::widget::menu::Item::Button(
@@ -419,6 +428,11 @@ impl cosmic::Application for AppModel {
                     fl!("rename"),
                     None,
                     NavMenuAction::RenameNode(entity),
+                ));
+                items.push(cosmic::widget::menu::Item::Button(
+                    fl!("move-to"),
+                    None,
+                    NavMenuAction::MoveNode(entity),
                 ));
             }
         }
@@ -676,6 +690,15 @@ impl cosmic::Application for AppModel {
                     NavMenuAction::RenameNode(entity) => self.update(Message::DialogAction(
                         dialogs::DialogAction::OpenRenameNodeDialog(entity),
                     )),
+                    NavMenuAction::MoveNode(entity) => {
+                        let vault_path = PathBuf::from(&self.config.vault_path);
+                        self.dialog_state.available_folders =
+                            self.collect_all_folders(&vault_path, entity);
+
+                        self.update(Message::DialogAction(
+                            dialogs::DialogAction::OpenMoveNodeDialog(entity),
+                        ))
+                    }
                 }
             }
 
@@ -977,6 +1000,54 @@ impl cosmic::Application for AppModel {
                         }
                     }
                 }
+                Task::none()
+            }
+            Message::MoveNode(source_entity, target_path) => {
+                let source_path = match self.nav_model.data::<ProjectNode>(source_entity) {
+                    Some(ProjectNode::File { path, .. } | ProjectNode::Folder { path, .. }) => {
+                        path.clone()
+                    }
+                    None => return Task::none(),
+                };
+
+                let file_name = match source_path.file_name() {
+                    Some(n) => n,
+                    None => return Task::none(),
+                };
+                let dest = target_path.join(file_name);
+
+                if source_path == target_path || dest == source_path {
+                    return Task::none();
+                }
+
+                if let Err(e) = std::fs::rename(&source_path, &dest) {
+                    return self.update(Message::AddToast(CedillaToast::new(e)));
+                }
+
+                let target_entity = self.nav_model.iter().find(|&id| {
+                    matches!(
+                        self.nav_model.data::<ProjectNode>(id),
+                        Some(ProjectNode::Folder { path, .. }) if *path == target_path
+                    )
+                });
+
+                if let Some(target_entity) = target_entity {
+                    self.move_nav_node(source_entity, target_entity, &dest);
+                } else {
+                    // target folder was never opened, reload from disk
+                    let vault_path = PathBuf::from(&self.config.vault_path);
+                    self.nav_model.clear();
+                    self.open_vault_folder(&vault_path);
+                }
+
+                if let State::Ready {
+                    path: open_path, ..
+                } = &mut self.state
+                    && open_path.as_deref() == Some(&source_path)
+                {
+                    *open_path = Some(dest);
+                }
+
                 Task::none()
             }
 

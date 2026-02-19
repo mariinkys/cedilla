@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-only
+#![allow(clippy::collapsible_if)]
 
-// Original code is from System76, see: https://github.com/pop-os/cosmic-edit/blob/master/src/project.rs
+// Code based on System76's, see: https://github.com/pop-os/cosmic-edit/blob/master/src/project.rs
 
 use cosmic::widget::icon;
 
@@ -72,25 +73,6 @@ impl AppModel {
         }
     }
 
-    // pub fn selected_directory(&self) -> PathBuf {
-    //     let active = self.nav_model.active();
-
-    //     if !self.nav_model.contains_item(active) {
-    //         return PathBuf::from(&self.config.vault_path);
-    //     }
-
-    //     match self.nav_model.data::<ProjectNode>(active) {
-    //         Some(ProjectNode::Folder { path, .. }) => path.clone(),
-    //         Some(ProjectNode::File { path, .. }) => {
-    //             // If a file is selected, use its parent directory
-    //             path.parent()
-    //                 .map(|p| p.to_path_buf())
-    //                 .unwrap_or_else(|| PathBuf::from(&self.config.vault_path))
-    //         }
-    //         None => PathBuf::from(&self.config.vault_path),
-    //     }
-    // }
-
     pub fn insert_file_node(&mut self, file_path: &PathBuf, parent_dir: &PathBuf) {
         let Ok(node) = ProjectNode::new(file_path) else {
             return;
@@ -100,7 +82,6 @@ impl AppModel {
             let mut pos = 0u16;
             let mut indent = 1u16;
             for nav_id in self.nav_model.iter() {
-                #[allow(clippy::collapsible_if)]
                 if let Some(ProjectNode::Folder { path, .. }) =
                     self.nav_model.data::<ProjectNode>(nav_id)
                 {
@@ -152,7 +133,6 @@ impl AppModel {
             let mut pos = 0u16;
             let mut indent = 1u16;
             for nav_id in self.nav_model.iter() {
-                #[allow(clippy::collapsible_if)]
                 if let Some(ProjectNode::Folder { path, .. }) =
                     self.nav_model.data::<ProjectNode>(nav_id)
                 {
@@ -230,7 +210,6 @@ impl AppModel {
         self.nav_model.remove(entity);
 
         // clear selected path if it was inside the deleted path
-        #[allow(clippy::collapsible_if)]
         if let Some(selected) = &self.selected_nav_path {
             if selected.starts_with(target_path) || selected == target_path {
                 self.selected_nav_path = None;
@@ -273,7 +252,6 @@ impl AppModel {
             }
         }
 
-        #[allow(clippy::collapsible_if)]
         if let Some(selected) = &self.selected_nav_path {
             if selected.starts_with(old_path) {
                 let suffix = selected.strip_prefix(old_path).unwrap().to_path_buf();
@@ -286,10 +264,174 @@ impl AppModel {
         }
     }
 
+    pub fn move_nav_node(
+        &mut self,
+        source_entity: cosmic::widget::segmented_button::Entity,
+        target_entity: cosmic::widget::segmented_button::Entity,
+        new_path: &PathBuf,
+    ) {
+        let source_indent = self.nav_model.indent(source_entity).unwrap_or(0);
+        let source_position = self.nav_model.position(source_entity).unwrap_or(0);
+
+        // collect children by walking positions sequentially after source
+        let children: Vec<cosmic::widget::segmented_button::Entity> = {
+            let mut result = Vec::new();
+            let mut pos = source_position + 1;
+            while let Some(id) = self.nav_model.entity_at(pos) {
+                if self.nav_model.indent(id).unwrap_or(0) > source_indent {
+                    result.push(id);
+                    pos += 1;
+                } else {
+                    break;
+                }
+            }
+            result
+        };
+
+        for child in children.iter().rev() {
+            self.nav_model.remove(*child);
+        }
+        self.nav_model.remove(source_entity);
+
+        // re-read target position/indent after removals since positions shifted
+        let target_position = self.nav_model.position(target_entity).unwrap_or(0);
+        let target_indent = self.nav_model.indent(target_entity).unwrap_or(0);
+
+        let target_is_open = matches!(
+            self.nav_model.data::<ProjectNode>(target_entity),
+            Some(ProjectNode::Folder { open: true, .. })
+        );
+
+        // if target is closed, don't insert anything — on_nav_select will
+        // populate it correctly from disk when the user opens it
+        if !target_is_open {
+            return;
+        }
+
+        // find insertion point after all existing children of target
+        let insert_position = {
+            let mut pos = target_position + 1;
+            let mut check = target_position + 1;
+            while let Some(id) = self.nav_model.entity_at(check) {
+                if self.nav_model.indent(id).unwrap_or(0) > target_indent {
+                    let child_is_folder = matches!(
+                        self.nav_model.data::<ProjectNode>(id),
+                        Some(ProjectNode::Folder { .. })
+                    );
+                    let source_is_folder = new_path.is_dir();
+                    if source_is_folder {
+                        if child_is_folder {
+                            pos = check + 1;
+                        }
+                    } else {
+                        pos = check + 1;
+                    }
+                    check += 1;
+                } else {
+                    break;
+                }
+            }
+            pos
+        };
+
+        let Ok(node) = ProjectNode::new(new_path) else {
+            return;
+        };
+
+        self.nav_model
+            .insert()
+            .position(insert_position)
+            .indent(target_indent + 1)
+            .icon(node.icon(18))
+            .text(node.name().to_string())
+            .data(node);
+
+        // populate children only if source was a folder (target is already confirmed open)
+        if new_path.is_dir() {
+            self.open_folder(new_path, insert_position + 1, target_indent + 2);
+        }
+    }
+
     pub fn selected_directory(&self) -> PathBuf {
         self.selected_nav_path
             .clone()
             .unwrap_or_else(|| PathBuf::from(&self.config.vault_path))
+    }
+
+    pub fn collect_all_folders(
+        &self,
+        vault_path: &PathBuf,
+        exclude_entity: cosmic::widget::segmented_button::Entity,
+    ) -> Vec<(PathBuf, String, u16)> {
+        let exclude_path = self
+            .nav_model
+            .data::<ProjectNode>(exclude_entity)
+            .map(|n| match n {
+                ProjectNode::Folder { path, .. } | ProjectNode::File { path, .. } => path.clone(),
+            });
+
+        let mut result = Vec::new();
+
+        // root always first
+        result.push((
+            vault_path.clone(),
+            self.nav_model
+                .iter()
+                .find_map(|id| {
+                    if matches!(
+                        self.nav_model.data::<ProjectNode>(id),
+                        Some(ProjectNode::Folder { root: true, .. })
+                    ) {
+                        self.nav_model.text(id).map(|t| t.to_string())
+                    } else {
+                        None
+                    }
+                })
+                .unwrap_or("Vault".to_string()),
+            0u16,
+        ));
+
+        self.collect_folders_recursive(vault_path, 1, &exclude_path, &mut result);
+        result
+    }
+
+    fn collect_folders_recursive(
+        &self,
+        dir: &PathBuf,
+        indent: u16,
+        exclude_path: &Option<PathBuf>,
+        result: &mut Vec<(PathBuf, String, u16)>,
+    ) {
+        let mut nodes: Vec<PathBuf> = ignore::WalkBuilder::new(dir)
+            .hidden(false)
+            .max_depth(Some(1))
+            .build()
+            .filter_map(|e| e.ok())
+            .filter(|e| e.depth() == 1 && e.path().is_dir())
+            .map(|e| e.path().to_path_buf())
+            .collect();
+
+        nodes.sort_by(|a, b| {
+            a.file_name()
+                .and_then(|n| n.to_str())
+                .unwrap_or("")
+                .cmp(b.file_name().and_then(|n| n.to_str()).unwrap_or(""))
+        });
+
+        for subdir in nodes {
+            if let Some(excl) = exclude_path {
+                if subdir == *excl || subdir.starts_with(excl) {
+                    continue;
+                }
+            }
+            let name = subdir
+                .file_name()
+                .and_then(|n| n.to_str())
+                .unwrap_or("")
+                .to_string();
+            result.push((subdir.clone(), name, indent - 1));
+            self.collect_folders_recursive(&subdir, indent + 1, exclude_path, result);
+        }
     }
 }
 
@@ -357,22 +499,11 @@ impl ProjectNode {
 
 impl Ord for ProjectNode {
     fn cmp(&self, other: &Self) -> Ordering {
-        match self {
-            // Folders are always before files
-            Self::Folder { .. } => {
-                if let Self::File { .. } = other {
-                    return Ordering::Less;
-                }
-            }
-            // Files are always after folders
-            Self::File { .. } => {
-                if let Self::Folder { .. } = other {
-                    return Ordering::Greater;
-                }
-            }
+        match (self, other) {
+            (Self::Folder { .. }, Self::File { .. }) => Ordering::Less,
+            (Self::File { .. }, Self::Folder { .. }) => Ordering::Greater,
+            _ => self.name().cmp(other.name()),
         }
-        Ordering::Greater // TODO:
-        // crate::localize::LANGUAGE_SORTER.compare(self.name(), other.name())
     }
 }
 

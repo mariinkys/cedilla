@@ -1,6 +1,6 @@
-use std::collections::VecDeque;
+use std::{collections::VecDeque, path::PathBuf};
 
-use cosmic::{Element, Task, theme, widget};
+use cosmic::{Element, Task, iced::Alignment, theme, widget};
 
 use crate::{app::Message, fl};
 
@@ -15,6 +15,8 @@ pub enum DialogPage {
     DeleteNode(cosmic::widget::segmented_button::Entity),
     /// Rename the currently selected folder/file
     RenameNode(cosmic::widget::segmented_button::Entity, String),
+    /// Move the given entity to a selected folder first entity = what to move, second = selected target folder (None if none chosen yet)
+    MoveNode(cosmic::widget::segmented_button::Entity, Option<PathBuf>),
 }
 
 impl DialogPage {
@@ -114,6 +116,56 @@ impl DialogPage {
                     ])
                     .spacing(spacing.space_xxs),
                 ),
+            DialogPage::MoveNode(source_entity, selected_target) => {
+                let folder_list = widget::column::with_children(
+                    dialog_state
+                        .available_folders
+                        .iter()
+                        .map(|(path, name, indent)| {
+                            let is_selected = selected_target.as_ref() == Some(path);
+                            let indent_padding = (*indent as f32) * 32.0;
+
+                            widget::button::custom(
+                                widget::row::with_children(vec![
+                                    widget::Space::with_width(indent_padding).into(),
+                                    widget::icon::from_name("folder-symbolic").size(16).into(),
+                                    widget::text::body(name.clone()).into(),
+                                ])
+                                .align_y(Alignment::Center)
+                                .spacing(spacing.space_xxs),
+                            )
+                            .on_press(Message::DialogAction(DialogAction::DialogUpdate(
+                                DialogPage::MoveNode(*source_entity, Some(path.clone())),
+                            )))
+                            .class(if is_selected {
+                                theme::Button::Suggested
+                            } else {
+                                theme::Button::MenuItem
+                            })
+                            .width(cosmic::iced::Length::Fill)
+                            .into()
+                        })
+                        .collect::<Vec<Element<Message>>>(),
+                )
+                .spacing(spacing.space_xxxs);
+
+                widget::dialog()
+                    .title(fl!("move-to"))
+                    .primary_action(
+                        widget::button::suggested(fl!("move")).on_press_maybe(
+                            selected_target
+                                .as_ref()
+                                .map(|_| Message::DialogAction(DialogAction::DialogComplete)),
+                        ),
+                    )
+                    .secondary_action(
+                        widget::button::standard(fl!("cancel"))
+                            .on_press(Message::DialogAction(DialogAction::DialogCancel)),
+                    )
+                    .control(
+                        widget::scrollable(folder_list).height(cosmic::iced::Length::Fixed(300.0)),
+                    )
+            }
         };
 
         Some(dialog.into())
@@ -131,6 +183,8 @@ pub enum DialogAction {
     OpenDeleteNodeDialog(cosmic::widget::segmented_button::Entity),
     /// Asks to open the [`DialogPage`] for renaming a vault folder/file
     OpenRenameNodeDialog(cosmic::widget::segmented_button::Entity),
+    /// Asks to open the [`DialogPage`] for moving a node in the vault
+    OpenMoveNodeDialog(cosmic::widget::segmented_button::Entity),
     /// Action after user confirms/ok's/accepts the action of a Dialog
     DialogComplete,
     /// Action after user cancels the action of a Dialog
@@ -182,6 +236,13 @@ impl DialogAction {
                                 )));
                             }
                         }
+                        DialogPage::MoveNode(source_entity, Some(target_path)) => {
+                            return Task::done(cosmic::action::app(Message::MoveNode(
+                                source_entity,
+                                target_path,
+                            )));
+                        }
+                        DialogPage::MoveNode(_, None) => {}
                     }
                 }
                 Task::none()
@@ -202,6 +263,10 @@ impl DialogAction {
                 dialog_pages.push_back(DialogPage::RenameNode(entity, String::new()));
                 widget::text_input::focus(dialog_state.dialog_text_input.clone())
             }
+            DialogAction::OpenMoveNodeDialog(entity) => {
+                dialog_pages.push_back(DialogPage::MoveNode(entity, None));
+                Task::none()
+            }
         }
     }
 }
@@ -210,12 +275,15 @@ impl DialogAction {
 pub struct DialogState {
     /// Input inside of the Dialog Pages of the Application
     pub dialog_text_input: widget::Id,
+    /// Available folders to move a node in
+    pub available_folders: Vec<(PathBuf, String, u16)>,
 }
 
 impl Default for DialogState {
     fn default() -> Self {
         Self {
             dialog_text_input: widget::Id::unique(),
+            available_folders: Vec::new(),
         }
     }
 }
