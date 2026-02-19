@@ -160,6 +160,8 @@ pub enum Message {
     FileSaved(Result<PathBuf, anywho::Error>),
     /// Deletes the given node entity of the navbar folder or file
     DeleteNode(cosmic::widget::segmented_button::Entity),
+    /// Renames the given node entity of the navbar folder or file
+    RenameNode(cosmic::widget::segmented_button::Entity, String),
 
     /// Pane grid resized callback
     PaneResized(pane_grid::ResizeEvent),
@@ -213,7 +215,8 @@ impl<'a> markdown::Viewer<'a, cosmic::theme::Theme, cosmic::iced_widget::Rendere
 
 #[derive(Copy, Clone, Debug, Eq, PartialEq)]
 pub enum NavMenuAction {
-    DeleteFile(segmented_button::Entity),
+    DeleteNode(segmented_button::Entity),
+    RenameNode(segmented_button::Entity),
 }
 
 impl cosmic::widget::menu::Action for NavMenuAction {
@@ -396,16 +399,26 @@ impl cosmic::Application for AppModel {
         match node {
             ProjectNode::File { .. } => {
                 items.push(cosmic::widget::menu::Item::Button(
-                    "Delete".to_string(),
+                    fl!("delete"),
                     None,
-                    NavMenuAction::DeleteFile(entity),
+                    NavMenuAction::DeleteNode(entity),
+                ));
+                items.push(cosmic::widget::menu::Item::Button(
+                    fl!("rename"),
+                    None,
+                    NavMenuAction::RenameNode(entity),
                 ));
             }
             ProjectNode::Folder { .. } => {
                 items.push(cosmic::widget::menu::Item::Button(
-                    "Delete".to_string(),
+                    fl!("delete"),
                     None,
-                    NavMenuAction::DeleteFile(entity),
+                    NavMenuAction::DeleteNode(entity),
+                ));
+                items.push(cosmic::widget::menu::Item::Button(
+                    fl!("rename"),
+                    None,
+                    NavMenuAction::RenameNode(entity),
                 ));
             }
         }
@@ -657,8 +670,11 @@ impl cosmic::Application for AppModel {
             Message::NavMenuAction(action) => {
                 self.nav_bar_context_id = segmented_button::Entity::null();
                 match action {
-                    NavMenuAction::DeleteFile(entity) => self.update(Message::DialogAction(
+                    NavMenuAction::DeleteNode(entity) => self.update(Message::DialogAction(
                         dialogs::DialogAction::OpenDeleteNodeDialog(entity),
+                    )),
+                    NavMenuAction::RenameNode(entity) => self.update(Message::DialogAction(
+                        dialogs::DialogAction::OpenRenameNodeDialog(entity),
                     )),
                 }
             }
@@ -898,6 +914,69 @@ impl cosmic::Application for AppModel {
                     return self.update(Message::NewFile);
                 }
 
+                Task::none()
+            }
+            Message::RenameNode(entity, new_name) => {
+                let Some(node) = self.nav_model.data::<ProjectNode>(entity).cloned() else {
+                    return Task::none();
+                };
+
+                let old_path = match &node {
+                    ProjectNode::File { path, .. } | ProjectNode::Folder { path, .. } => {
+                        path.clone()
+                    }
+                };
+
+                let new_name = match &node {
+                    ProjectNode::File { .. } => {
+                        if new_name.ends_with(".md") {
+                            new_name
+                        } else {
+                            format!("{}.md", new_name)
+                        }
+                    }
+                    ProjectNode::Folder { .. } => new_name,
+                };
+
+                let new_path = match old_path.parent() {
+                    Some(parent) => parent.join(&new_name),
+                    None => return Task::none(),
+                };
+
+                if new_path == old_path {
+                    return Task::none();
+                }
+
+                if new_path.exists() {
+                    return self.update(Message::AddToast(CedillaToast::new(format!(
+                        "A file or folder named {:?} already exists",
+                        new_name
+                    ))));
+                }
+
+                if let Err(e) = std::fs::rename(&old_path, &new_path) {
+                    return self.update(Message::AddToast(CedillaToast::new(e)));
+                }
+
+                self.rename_nav_node(&old_path, &new_path, &new_name);
+
+                // update the open editor state if the open file was inside the renamed path
+                #[allow(clippy::collapsible_if)]
+                if let State::Ready {
+                    path: open_path, ..
+                } = &mut self.state
+                {
+                    if let Some(current) = open_path.as_deref() {
+                        if current.starts_with(&old_path) {
+                            let suffix = current.strip_prefix(&old_path).unwrap().to_path_buf();
+                            *open_path = Some(if suffix == std::path::Path::new("") {
+                                new_path.clone()
+                            } else {
+                                new_path.join(suffix)
+                            });
+                        }
+                    }
+                }
                 Task::none()
             }
 

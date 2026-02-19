@@ -238,6 +238,54 @@ impl AppModel {
         }
     }
 
+    pub fn rename_nav_node(&mut self, old_path: &Path, new_path: &Path, new_name: &str) {
+        let ids: Vec<_> = self.nav_model.iter().collect();
+
+        for child_id in ids {
+            let is_renamed_node = if let Some(child_node) =
+                self.nav_model.data_mut::<ProjectNode>(child_id)
+            {
+                match child_node {
+                    ProjectNode::File { path, name } | ProjectNode::Folder { path, name, .. } => {
+                        if path.starts_with(old_path) {
+                            let suffix = path.strip_prefix(old_path).unwrap().to_path_buf();
+                            *path = if suffix == std::path::Path::new("") {
+                                new_path.to_path_buf()
+                            } else {
+                                new_path.join(&suffix)
+                            };
+                            if suffix == std::path::Path::new("") {
+                                *name = new_name.to_string();
+                                true
+                            } else {
+                                false
+                            }
+                        } else {
+                            false
+                        }
+                    }
+                }
+            } else {
+                false
+            };
+            if is_renamed_node {
+                self.nav_model.text_set(child_id, new_name.to_string());
+            }
+        }
+
+        #[allow(clippy::collapsible_if)]
+        if let Some(selected) = &self.selected_nav_path {
+            if selected.starts_with(old_path) {
+                let suffix = selected.strip_prefix(old_path).unwrap().to_path_buf();
+                self.selected_nav_path = Some(if suffix == std::path::Path::new("") {
+                    new_path.to_path_buf()
+                } else {
+                    new_path.join(suffix)
+                });
+            }
+        }
+    }
+
     pub fn selected_directory(&self) -> PathBuf {
         self.selected_nav_path
             .clone()
