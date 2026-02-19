@@ -10,7 +10,7 @@ use crate::config::{AppTheme, CedillaConfig, ConfigInput, ShowState};
 use crate::key_binds::key_binds;
 use crate::{fl, icons};
 use cosmic::app::context_drawer;
-use cosmic::iced::{Alignment, Event, Length, Subscription, highlighter};
+use cosmic::iced::{Alignment, Event, Length, Padding, Subscription, highlighter};
 use cosmic::iced_core::keyboard::{Key, Modifiers};
 use cosmic::iced_widget::{center, column, row, tooltip};
 use cosmic::widget::menu::Action;
@@ -1191,7 +1191,12 @@ fn cedilla_main_view<'a>(
     };
 
     container(content_column)
-        .padding(spacing.space_xxs)
+        .padding(
+            Padding::new(spacing.space_xxs as f32)
+                .left(0.)
+                .right(0.)
+                .top(0.),
+        )
         .width(Length::Fill)
         .height(Length::Fill)
         .into()
