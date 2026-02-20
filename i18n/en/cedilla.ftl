@@ -43,6 +43,7 @@ new-file = New File
 new-folder = New Folder
 new-vault-file = New Vault File
 save-file = Save File
+export-pdf = Export PDF
 
 edit = Edit
 undo = Undo

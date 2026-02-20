@@ -48,7 +48,7 @@ use cosmic::iced_core::mouse;
 use cosmic::iced_core::renderer;
 use cosmic::iced_core::text::editor::{Cursor, Editor as _};
 use cosmic::iced_core::text::highlighter::{self, Highlighter};
-use cosmic::iced_core::text::{self, LineHeight, Text, Wrapping};
+use cosmic::iced_core::text::{self, Ellipsize, LineHeight, Text, Wrapping};
 use cosmic::iced_core::time::{Duration, Instant};
 use cosmic::iced_core::widget::operation;
 use cosmic::iced_core::widget::{self, Widget};
@@ -126,6 +126,7 @@ where
     height: Length,
     padding: Padding,
     wrapping: Wrapping,
+    ellipsize: text::Ellipsize,
     retain_focus_on_external_click: bool,
     class: Theme::Class<'a>,
     key_binding: Option<Box<dyn Fn(KeyPress) -> Option<Binding<Message>> + 'a>>,
@@ -152,6 +153,7 @@ where
             height: Length::Shrink,
             padding: Padding::new(5.0),
             wrapping: Wrapping::default(),
+            ellipsize: Ellipsize::default(),
             retain_focus_on_external_click: false,
             class: Theme::default(),
             key_binding: None,
@@ -282,6 +284,7 @@ where
             height: self.height,
             padding: self.padding,
             wrapping: self.wrapping,
+            ellipsize: self.ellipsize,
             retain_focus_on_external_click: self.retain_focus_on_external_click,
             class: self.class,
             key_binding: self.key_binding,
@@ -823,6 +826,7 @@ where
                         vertical_alignment: alignment::Vertical::Top,
                         shaping: text::Shaping::Advanced,
                         wrapping: self.wrapping,
+                        ellipsize: self.ellipsize,
                     },
                     text_bounds.position(),
                     style.placeholder,

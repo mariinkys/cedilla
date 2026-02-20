@@ -1,6 +1,9 @@
 use anywho::anywho;
 use cosmic::dialog::{ashpd::desktop::file_chooser::SelectedFiles, file_chooser::FileFilter};
+use markdown2pdf::parse_into_file;
 use std::{path::PathBuf, sync::Arc};
+
+static BODY_FONT: &[u8] = include_bytes!("../../../../resources/fonts/LiberationSans-Regular.ttf");
 
 pub async fn load_file(path: PathBuf) -> Result<(PathBuf, Arc<String>), anywho::Error> {
     let contents = tokio::fs::read_to_string(&path)
@@ -181,6 +184,33 @@ pub async fn open_markdown_file_saver(vault_path: String) -> Option<String> {
     }
 }
 
+/// Open a system dialog to select where to save a markdown file, returns the selected file (if any)
+pub async fn open_pdf_file_saver(vault_path: String) -> Option<String> {
+    let result = SelectedFiles::save_file()
+        .title("Save File")
+        .accept_label("Save")
+        .modal(true)
+        .current_folder(vault_path)
+        .unwrap_or_default()
+        .filter(FileFilter::new("PDF Files").glob("*.pdf"))
+        .send()
+        .await
+        .unwrap()
+        .response();
+
+    if let Ok(result) = result {
+        result
+            .uris()
+            .iter()
+            .map(|file| file.path().to_string())
+            .collect::<Vec<String>>()
+            .first()
+            .cloned()
+    } else {
+        None
+    }
+}
+
 /// Open a system dialog to select a folder
 pub async fn open_folder_picker(vault_path: String) -> Option<String> {
     let result = SelectedFiles::open_file()
@@ -210,4 +240,28 @@ pub async fn open_folder_picker(vault_path: String) -> Option<String> {
     } else {
         None
     }
+}
+
+pub async fn export_pdf(
+    markdown: String,
+    file_destination_path: String,
+) -> Result<(), anywho::Error> {
+    tokio::task::spawn_blocking(move || -> Result<(), anywho::Error> {
+        let font_config = markdown2pdf::fonts::FontConfig::new()
+            .with_default_font_source(markdown2pdf::fonts::FontSource::Bytes(BODY_FONT))
+            .with_code_font_source(markdown2pdf::fonts::FontSource::Bytes(BODY_FONT));
+
+        parse_into_file(
+            markdown,
+            file_destination_path.as_str(),
+            markdown2pdf::config::ConfigSource::Default,
+            Some(&font_config),
+        )?;
+        Ok(())
+    })
+    .await
+    .map_err(|e| anywho!("Failed to generate PDF: {}", e))
+    .and_then(|r| r)?;
+
+    Ok(())
 }

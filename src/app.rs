@@ -188,6 +188,8 @@ pub enum Message {
     Undo,
     /// Redo requested
     Redo,
+    /// Export current document to PDF
+    ExportPDF,
 
     /// Callback after input on the Config [`ContextPage`]
     ConfigInput(ConfigInput),
@@ -1286,6 +1288,33 @@ impl cosmic::Application for AppModel {
                 }
                 Task::none()
             }
+            Message::ExportPDF => {
+                let State::Ready { editor_content, .. } = &mut self.state else {
+                    return Task::none();
+                };
+
+                let content = editor_content.text();
+                let vault_path = self.config.vault_path.clone();
+
+                Task::perform(
+                    async move {
+                        match utils::files::open_pdf_file_saver(vault_path).await {
+                            Some(path) => Some(utils::files::export_pdf(content, path).await),
+                            // Error selecting where to save the file
+                            None => None,
+                        }
+                    },
+                    |res| match res {
+                        Some(result) => match result {
+                            Ok(_) => cosmic::action::app(Message::AddToast(CedillaToast::new(
+                                "Exported Correctly",
+                            ))),
+                            Err(e) => cosmic::action::app(Message::AddToast(CedillaToast::new(e))),
+                        },
+                        None => cosmic::action::none(),
+                    },
+                )
+            }
 
             #[allow(clippy::collapsible_if)]
             Message::ConfigInput(input) => match input {
@@ -1649,6 +1678,9 @@ fn cedilla_main_view<'a>(
                     .on_press(Message::ApplyFormatting(utils::SelectionAction::Heading1)),
                 button::icon(icons::get_handle("helperbar/rule-symbolic", 18))
                     .on_press(Message::ApplyFormatting(utils::SelectionAction::Rule)),
+                Space::new(Length::Fill, 0.),
+                button::icon(icons::get_handle("helperbar/pdf-symbolic", 18))
+                    .on_press_maybe(path.is_some().then_some(Message::ExportPDF)),
             ]
             .padding(spacing.space_xxs)
             .spacing(spacing.space_xxs),
