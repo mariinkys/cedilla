@@ -920,6 +920,7 @@ dependencies = [
  "image",
  "libcosmic",
  "open",
+ "percent-encoding",
  "pulldown-cmark",
  "reqwest",
  "rust-embed",

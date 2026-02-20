@@ -28,6 +28,8 @@ light = Light
 general = General
 help-bar = Editor Help Bar
 status-bar = Status Bar
+move-vault = Move Vault
+current-location = Current Location: { $location }
 show = Show
 hide = Hide
 

@@ -164,6 +164,10 @@ pub enum Message {
     RenameNode(cosmic::widget::segmented_button::Entity, String),
     /// Move one node (to another one)
     MoveNode(cosmic::widget::segmented_button::Entity, PathBuf),
+    /// Ask to move the main vault to another path
+    MoveVault,
+    /// Callback after asking to move the vault
+    VaultMoved(Result<PathBuf, anywho::Error>),
 
     /// Pane grid resized callback
     PaneResized(pane_grid::ResizeEvent),
@@ -289,7 +293,25 @@ impl cosmic::Application for AppModel {
 
         // load vault
         let vault_path = PathBuf::from(&app.config.vault_path);
-        app.open_vault_folder(&vault_path);
+        if vault_path.exists() && vault_path.is_dir() {
+            app.open_vault_folder(&vault_path);
+        } else {
+            eprintln!("Vault not found, trying to fallback to default path");
+            let default_vault_path = PathBuf::from(CedillaConfig::default().vault_path);
+
+            #[allow(clippy::collapsible_if)]
+            if let Some(handler) = &app.config_handler {
+                if let Err(err) = app
+                    .config
+                    .set_vault_path(handler, default_vault_path.to_string_lossy().to_string())
+                {
+                    eprintln!("{err}");
+                }
+            }
+
+            app.config.vault_path = default_vault_path.to_string_lossy().to_string();
+            app.open_vault_folder(&default_vault_path);
+        }
 
         // Startup tasks.
         let tasks = vec![
@@ -1050,6 +1072,56 @@ impl cosmic::Application for AppModel {
 
                 Task::none()
             }
+            Message::MoveVault => {
+                let old_vault_path = self.config.vault_path.clone();
+
+                Task::perform(
+                    async move {
+                        match utils::files::open_folder_picker(old_vault_path.clone()).await {
+                            Some(path) => Some(
+                                utils::files::move_vault(path.into(), old_vault_path.into()).await,
+                            ),
+                            // Error selecting where to move the vault
+                            None => None,
+                        }
+                    },
+                    |res| match res {
+                        Some(result) => cosmic::action::app(Message::VaultMoved(result)),
+                        None => cosmic::action::none(),
+                    },
+                )
+            }
+            Message::VaultMoved(result) => {
+                match result {
+                    Ok(new_path) => {
+                        // update the vault path in the config
+                        #[allow(clippy::collapsible_if)]
+                        if let Some(handler) = &self.config_handler {
+                            if let Err(err) = self
+                                .config
+                                .set_vault_path(handler, new_path.to_string_lossy().to_string())
+                            {
+                                eprintln!("{err}");
+                                // even if it fails we update the config (it won't get saved after restart)
+                                let mut old_config = self.config.clone();
+                                old_config.vault_path = new_path.to_string_lossy().to_string();
+                                self.config = old_config;
+                            }
+                        }
+
+                        // clear the navbar
+                        self.core.nav_bar_set_toggled(false);
+                        self.nav_model.clear();
+
+                        // load vault
+                        let vault_path = PathBuf::from(&self.config.vault_path);
+                        self.open_vault_folder(&vault_path);
+
+                        Task::done(cosmic::action::app(Message::NewFile))
+                    }
+                    Err(e) => self.update(Message::AddToast(CedillaToast::new(e))),
+                }
+            }
 
             Message::PaneResized(event) => {
                 let State::Ready { panes, .. } = &mut self.state else {
@@ -1231,6 +1303,20 @@ impl AppModel {
                         Some(app_theme_selected),
                         |t| Message::ConfigInput(ConfigInput::UpdateTheme(t)),
                     )),
+                )
+                .into(),
+            widget::settings::section()
+                .title(fl!("general"))
+                .add(
+                    widget::settings::item::builder(fl!("move-vault"))
+                        .description(fl!(
+                            "current-location",
+                            location = self.config.vault_path.to_string()
+                        ))
+                        .control(
+                            widget::button::destructive(fl!("move-vault"))
+                                .on_press(Message::MoveVault),
+                        ),
                 )
                 .into(),
             widget::settings::section()
