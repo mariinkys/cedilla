@@ -60,14 +60,22 @@ impl AppModel {
             return Task::none();
         };
 
-        // format the selected text
-        let formatted =
-            format_selected_text(&editor_content.selection().unwrap_or_default(), action);
+        let selection = editor_content.selection().unwrap_or_default();
+        let formatted = format_selected_text(&selection, action);
+        let formatted_len = formatted.chars().count();
 
         // replace the selection (or insert if no selection)
         editor_content.perform(text_editor::Action::Edit(text_editor::Edit::Paste(
             Arc::new(formatted),
         )));
+
+        for _ in 0..formatted_len {
+            editor_content.perform(text_editor::Action::Move(text_editor::Motion::Left));
+        }
+
+        for _ in 0..formatted_len {
+            editor_content.perform(text_editor::Action::Select(text_editor::Motion::Right));
+        }
 
         *is_dirty = true;
         *items = markdown::parse(editor_content.text().as_ref()).collect();

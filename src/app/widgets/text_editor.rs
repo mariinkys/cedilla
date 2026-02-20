@@ -126,6 +126,7 @@ where
     height: Length,
     padding: Padding,
     wrapping: Wrapping,
+    retain_focus_on_external_click: bool,
     class: Theme::Class<'a>,
     key_binding: Option<Box<dyn Fn(KeyPress) -> Option<Binding<Message>> + 'a>>,
     on_edit: Option<Box<dyn Fn(Action) -> Message + 'a>>,
@@ -151,6 +152,7 @@ where
             height: Length::Shrink,
             padding: Padding::new(5.0),
             wrapping: Wrapping::default(),
+            retain_focus_on_external_click: false,
             class: Theme::default(),
             key_binding: None,
             on_edit: None,
@@ -194,6 +196,12 @@ where
     /// Sets the width of the [`TextEditor`].
     pub fn width(mut self, width: impl Into<Pixels>) -> Self {
         self.width = Length::from(width.into());
+        self
+    }
+
+    /// Controls wether to lose the text selection on external click
+    pub fn retain_focus_on_external_click(mut self, retain: bool) -> Self {
+        self.retain_focus_on_external_click = retain;
         self
     }
 
@@ -274,6 +282,7 @@ where
             height: self.height,
             padding: self.padding,
             wrapping: self.wrapping,
+            retain_focus_on_external_click: self.retain_focus_on_external_click,
             class: self.class,
             key_binding: self.key_binding,
             on_edit: self.on_edit,
@@ -645,6 +654,7 @@ where
             self.padding,
             cursor,
             self.key_binding.as_deref(),
+            self.retain_focus_on_external_click,
         ) else {
             return event::Status::Ignored;
         };
@@ -1058,6 +1068,7 @@ impl<Message> Update<Message> {
         padding: Padding,
         cursor: mouse::Cursor,
         key_binding: Option<&dyn Fn(KeyPress) -> Option<Binding<Message>>>,
+        retain_focus_on_external_click: bool,
     ) -> Option<Self> {
         let binding = |binding| Some(Update::Binding(binding));
 
@@ -1076,7 +1087,11 @@ impl<Message> Update<Message> {
 
                         Some(Update::Click(click))
                     } else if state.focus.is_some() {
-                        binding(Binding::Unfocus)
+                        if retain_focus_on_external_click {
+                            None
+                        } else {
+                            binding(Binding::Unfocus)
+                        }
                     } else {
                         None
                     }

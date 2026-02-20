@@ -1297,6 +1297,7 @@ fn cedilla_main_view<'a>(
                         |highlight, _theme| highlight.to_format(),
                     )
                     .padding(0)
+                    .retain_focus_on_external_click(true)
                     .on_action(Message::Edit),
             )
             .height(Length::Fixed(size.height - 5.)) // This is a bit of a workaround but it works
