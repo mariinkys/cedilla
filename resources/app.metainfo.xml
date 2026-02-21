@@ -1,35 +1,99 @@
-<?xml version="1.0" encoding="UTF-8"?>
+<?xml version="1.0" encoding="UTF-8" ?>
 <component type="desktop-application">
   <id>dev.mariinkys.Cedilla</id>
-  <metadata_license>CC0-1.0</metadata_license>
-  <project_license>GPL-3.0</project_license>
+  <developer id="dev.mariinkys">
+    <name>mariinkys</name>
+  </developer>
+  <url type="homepage">https://github.com/mariinkys/cedilla</url>
+  <url type="bugtracker">https://github.com/mariinkys/cedilla/issues</url>
+  <url type="donation">https://buymeacoffee.com/mariinkys</url>
+
   <name>Cedilla</name>
-  <summary>A markdown text editor for the COSMIC™ desktop</summary>
-  <icon type="remote" width="64" height="64" scale="1">
-    https://github.com/mariinkys/cedilla/raw/main/resources/icons/hicolor/scalable/apps/icon.svg
-  </icon>
-  <url type="vcs-browser">https://github.com/mariinkys/cedilla</url>
+  <summary>Markdown Text Editor</summary>
+
+  <metadata_license>CC0-1.0</metadata_license>
+  <project_license>GPL-3.0-only</project_license>
+
+  <description>
+    <p
+        >Cedilla is a simple and focused Markdown text editor designed for writing without
+      distractions. Whether you're taking notes, drafting documentation, or writing blog posts,
+      Cedilla provides a clean and intuitive environment for working with plain text and
+      Markdown.</p>
+    <ul>
+      <li>Clean and minimal writing interface</li>
+      <li>Live Markdown preview</li>
+      <li>Fast and lightweight</li>
+      <li>Works completely offline</li>
+    </ul>
+    <p
+        >This app has been developed with libcosmic for the COSMIC™ desktop, and issues may occur on
+      other platforms</p>
+  </description>
+
+  <icon type="remote" height="256" width="256">
+    https://raw.githubusercontent.com/mariinkys/cedilla/main/resources/icons/hicolor/scalable/apps/icon.svg</icon>
   <launchable type="desktop-id">dev.mariinkys.Cedilla.desktop</launchable>
+  <content_rating type="oars-1.1" />
+
   <provides>
-    <id>dev.mariinkys.Cedilla</id>
-    <binaries>
-      <binary>cedilla</binary>
-    </binaries>
+    <id>com.system76.CosmicApplication</id>
+    <binary>cedilla</binary>
   </provides>
+
+  <screenshots>
+    <screenshot type="default" xml:lang="en">
+      <image>
+        https://raw.githubusercontent.com/mariinkys/cedilla/main/resources/screenshots/main-light.png</image>
+      <caption>Main Page (Light)</caption>
+    </screenshot>
+    <screenshot xml:lang="en">
+      <image>
+        https://raw.githubusercontent.com/mariinkys/cedilla/main/resources/screenshots/main-dark.png</image>
+      <caption>Main Page (Dark)</caption>
+    </screenshot>
+  </screenshots>
+
+  <branding>
+    <color type="primary" scheme_preference="light">#0F766E</color>
+    <color type="primary" scheme_preference="dark">#14B8A6</color>
+  </branding>
+
   <requires>
-    <display_length compare="ge">360</display_length>
+    <display_length compare="ge">600</display_length>
   </requires>
+
   <supports>
     <control>keyboard</control>
     <control>pointing</control>
     <control>touch</control>
   </supports>
+
   <categories>
     <category>COSMIC</category>
+    <category>Utility</category>
+    <category>Office</category>
+    <category>TextTools</category>
   </categories>
+
   <keywords>
     <keyword>COSMIC</keyword>
+    <keyword>Markdown</keyword>
+    <keyword>MD</keyword>
+    <keyword>Editor</keyword>
+    <keyword>Text</keyword>
+    <keyword>Writing</keyword>
+    <keyword>Notes</keyword>
+    <keyword>Documentation</keyword>
+    <keyword>Markup</keyword>
+    <keyword>Preview</keyword>
   </keywords>
-  <content_rating type="oars-1.1" />
-</component>
 
+  <releases>
+    <release version="0.1.0" date="2026-03-29">
+      <description>
+        <p>Application Release</p>
+      </description>
+    </release>
+  </releases>
+</component>
