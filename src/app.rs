@@ -14,6 +14,7 @@ use cosmic::iced::{Alignment, Event, Length, Padding, Subscription, highlighter,
 use cosmic::iced_core::keyboard::{Key, Modifiers};
 use cosmic::iced_widget::{center, column, row, sensor, tooltip};
 use cosmic::widget::menu::Action;
+use cosmic::widget::space::horizontal;
 use cosmic::widget::{self, about::About, menu};
 use cosmic::widget::{
     Space, ToastId, Toasts, button, container, nav_bar, pane_grid, responsive, scrollable,
@@ -1612,14 +1613,9 @@ fn cedilla_main_view<'a>(
         };
 
         container(
-            row![
-                file_path,
-                dirty_indicator,
-                Space::with_width(Length::Fill),
-                position
-            ]
-            .padding(spacing.space_xxs)
-            .spacing(spacing.space_xxs),
+            row![file_path, dirty_indicator, horizontal(), position]
+                .padding(spacing.space_xxs)
+                .spacing(spacing.space_xxs),
         )
         .width(Length::Fill)
         .class(theme::Container::Card)
@@ -1633,14 +1629,14 @@ fn cedilla_main_view<'a>(
                     .on_press(Message::ApplyFormatting(utils::SelectionAction::Bold)),
                 button::icon(icons::get_handle("helperbar/italic-symbolic", 18))
                     .on_press(Message::ApplyFormatting(utils::SelectionAction::Italic)),
-                Space::new(18., 0.),
+                Space::new().width(18.).height(0.),
                 button::icon(icons::get_handle("helperbar/link-symbolic", 18))
                     .on_press(Message::ApplyFormatting(utils::SelectionAction::Hyperlink)),
                 button::icon(icons::get_handle("helperbar/code-symbolic", 18))
                     .on_press(Message::ApplyFormatting(utils::SelectionAction::Code)),
                 button::icon(icons::get_handle("helperbar/image-symbolic", 18))
                     .on_press(Message::ApplyFormatting(utils::SelectionAction::Image)),
-                Space::new(18., 0.),
+                Space::new().width(18.).height(0.),
                 button::icon(icons::get_handle("helperbar/bulleted-list-symbolic", 18)).on_press(
                     Message::ApplyFormatting(utils::SelectionAction::BulletedList)
                 ),
