@@ -5,14 +5,14 @@ use crate::app::context_page::ContextPage;
 use crate::app::core::project::ProjectNode;
 use crate::app::core::utils::{self, CedillaToast};
 use crate::app::dialogs::{DialogPage, DialogState};
-use crate::app::widgets::{TextEditor, markdown, sensor, text_editor};
+use crate::app::widgets::{TextEditor, markdown, text_editor};
 use crate::config::{AppTheme, BoolState, CedillaConfig, ConfigInput, ShowState};
 use crate::key_binds::key_binds;
 use crate::{fl, icons};
 use cosmic::app::context_drawer;
 use cosmic::iced::{Alignment, Event, Length, Padding, Subscription, highlighter, window};
 use cosmic::iced_core::keyboard::{Key, Modifiers};
-use cosmic::iced_widget::{center, column, row, tooltip};
+use cosmic::iced_widget::{center, column, row, sensor, tooltip};
 use cosmic::widget::menu::Action;
 use cosmic::widget::{self, about::About, menu};
 use cosmic::widget::{
@@ -1602,8 +1602,13 @@ fn cedilla_main_view<'a>(
         };
 
         let position = {
-            let (line, column) = editor_content.cursor_position();
-            text(format!("{}:{}", line + 1, column + 1)).size(12)
+            let cursor = editor_content.cursor();
+            text(format!(
+                "{}:{}",
+                cursor.position.line + 1,
+                cursor.position.column + 1
+            ))
+            .size(12)
         };
 
         container(
