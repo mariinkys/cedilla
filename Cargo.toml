@@ -20,7 +20,7 @@ rust-embed = "8.11.0"
 serde = { version = "1.0.228", features = ["derive"] }
 tokio = { version = "1.49.0", features = ["fs"] }
 anywho = "0.1.2"
-pulldown-cmark = "0.13.0"
+pulldown-cmark = "0.13.1"
 url = "2.5.8"
 reqwest = "0.13.2"
 image = "0.25.9"
@@ -56,6 +56,8 @@ features = [
    "xdg-portal",
    # Highlighter support
    "highlighter",
+   # Markdown support
+   "markdown",
 ]
 
 # Uncomment to test a locally-cloned libcosmic
