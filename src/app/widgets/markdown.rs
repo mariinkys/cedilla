@@ -1301,7 +1301,7 @@ where
                 }
                 Bullet::Task { done, .. } => {
                     Element::from(
-                        container(checkbox("", *done).size(settings.text_size))
+                        container(checkbox(*done).size(settings.text_size))
                             .center_y(text::LineHeight::default().to_absolute(settings.text_size)),
                     )
                 }
@@ -1403,9 +1403,7 @@ where
     Renderer: cosmic::iced_core::text::Renderer<Font = Font> + 'a,
 {
     row![
-        container(cosmic::iced_widget::vertical_rule(4.0))
-            .width(4.0)
-            .height(Length::Fill),
+        rule::vertical(4),
         column(
             contents
                 .iter()
@@ -1415,7 +1413,6 @@ where
         .spacing(settings.spacing.0),
     ]
     .height(Length::Shrink)
-    .align_y(cosmic::iced::Alignment::Center)
     .spacing(settings.spacing.0)
     .into()
 }
