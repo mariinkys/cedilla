@@ -1501,24 +1501,27 @@ fn cedilla_main_view<'a>(
 
     let create_editor = || {
         container(responsive(|size| {
-            scrollable(
-                TextEditor::new(editor_content)
-                    .highlight_with::<highlighter::Highlighter>(
-                        highlighter::Settings {
-                            theme: highlighter::Theme::InspiredGitHub,
-                            token: path
-                                .as_ref()
-                                .and_then(|path| path.extension()?.to_str())
-                                .unwrap_or("md")
-                                .to_string(),
-                        },
-                        |highlight, _theme| highlight.to_format(),
-                    )
-                    .padding(0)
-                    .retain_focus_on_external_click(true)
-                    .on_action(Message::Edit),
+            widget::id_container(
+                scrollable(
+                    TextEditor::new(editor_content)
+                        .highlight_with::<highlighter::Highlighter>(
+                            highlighter::Settings {
+                                theme: highlighter::Theme::InspiredGitHub,
+                                token: path
+                                    .as_ref()
+                                    .and_then(|path| path.extension()?.to_str())
+                                    .unwrap_or("md")
+                                    .to_string(),
+                            },
+                            |highlight, _theme| highlight.to_format(),
+                        )
+                        .padding(0)
+                        .retain_focus_on_external_click(true)
+                        .on_action(Message::Edit),
+                )
+                .height(Length::Fixed(size.height - 5.)), // This is a bit of a workaround but it works,
+                widget::Id::new("text_editor_widget"),
             )
-            .height(Length::Fixed(size.height - 5.)) // This is a bit of a workaround but it works
             .into()
         }))
         .padding([5, spacing.space_xxs])
