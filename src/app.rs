@@ -11,8 +11,12 @@ use crate::key_binds::key_binds;
 use crate::{fl, icons};
 use cosmic::app::context_drawer;
 use cosmic::iced::time::milliseconds;
-use cosmic::iced::{Alignment, Event, Length, Padding, Subscription, highlighter, window};
+use cosmic::iced::{
+    Alignment, Color, Event, Font, Length, Padding, Subscription, border, color, highlighter,
+    window,
+};
 use cosmic::iced_core::keyboard::{Key, Modifiers};
+use cosmic::iced_core::text::Highlight;
 use cosmic::iced_widget::{center, center_x, column, hover, right, row, sensor, tooltip};
 use cosmic::widget::menu::Action;
 use cosmic::widget::space::horizontal;
@@ -203,7 +207,7 @@ struct MarkdownViewer<'a> {
     images: &'a HashMap<markdown::Uri, ImageState>,
 }
 
-impl<'a> markdown::Viewer<'a, Message> for MarkdownViewer<'a> {
+impl<'a> markdown::Viewer<'a, Message, cosmic::Theme, cosmic::Renderer> for MarkdownViewer<'a> {
     fn on_link_click(url: markdown::Uri) -> Message {
         Message::LaunchUrl(url)
     }
@@ -1579,7 +1583,21 @@ fn cedilla_main_view<'a>(
                 PaneContent::Editor => create_editor().into(),
                 PaneContent::Preview => container(scrollable(markdown::view_with(
                     items,
-                    markdown::Settings::default(),
+                    markdown::Settings::with_text_size(
+                        16.,
+                        cosmic::widget::markdown::Style {
+                            font: Font::default(),
+                            inline_code_padding: cosmic::iced::padding::left(1).right(1),
+                            inline_code_highlight: Highlight {
+                                background: color!(0x111111).into(),
+                                border: border::rounded(4),
+                            },
+                            inline_code_color: Color::WHITE,
+                            inline_code_font: Font::MONOSPACE,
+                            code_block_font: Font::MONOSPACE,
+                            link_color: color!(0x6495ED),
+                        },
+                    ),
                     &MarkdownViewer {
                         images: markdown_images,
                     },
