@@ -15,8 +15,8 @@ comrak = { version = "0.50", default-features = false, optional = true }
 
 [dev-dependencies]
 tokio.workspace = true
-open = "5.3.3"
-reqwest = "0.13.2"
+reqwest.workspace = true
+open.workspace = true
 
 [features]
 default = ["markdown", "libcosmic-wgpu", "libcosmic-tokio", "libcosmic-windowing"]

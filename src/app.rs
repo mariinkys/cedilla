@@ -3,7 +3,7 @@
 use crate::app::app_menu::MenuAction;
 use crate::app::context_page::ContextPage;
 use crate::app::core::project::ProjectNode;
-use crate::app::core::utils::{self, CedillaToast};
+use crate::app::core::utils::{self, CedillaToast, Image};
 use crate::app::dialogs::{DialogPage, DialogState};
 use crate::app::widgets::{TextEditor, text_editor};
 use crate::config::{AppTheme, BoolState, CedillaConfig, ConfigInput, ShowState};
@@ -17,13 +17,13 @@ use cosmic::widget::menu::Action;
 use cosmic::widget::space::horizontal;
 use cosmic::widget::{self, about::About, menu};
 use cosmic::widget::{
-    ToastId, Toasts, button, container, nav_bar, pane_grid, responsive, scrollable,
+    ToastId, Toasts, button, container, image, nav_bar, pane_grid, responsive, scrollable,
     segmented_button, text, toaster,
 };
 use cosmic::{prelude::*, surface, theme};
 use frostmark::{MarkState, MarkWidget, UpdateMsg};
 use slotmap::Key as SlotMapKey;
-use std::collections::{HashMap, VecDeque};
+use std::collections::{HashMap, HashSet, VecDeque};
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
 
@@ -81,6 +81,10 @@ enum State {
         editor_content: text_editor::Content,
         /// Markdown Preview state
         markstate: MarkState,
+        /// Images in the Markdown preview
+        images: HashMap<String, image::Handle>,
+        /// Keep track of images in progress/downloading
+        images_in_progress: HashSet<String>,
         /// Track if any changes have been made to the current file
         is_dirty: bool,
         /// Pane grid state
@@ -166,6 +170,8 @@ pub enum Message {
 
     /// Update the HTML renderer state
     UpdateMarkState(UpdateMsg),
+    /// Callback after a Markdown image has been downloaded
+    ImageDownloaded(Result<Image, anywho::Error>),
     /// Set's the preview to the desired state
     SetPreviewState(PreviewState),
     /// Pane grid resized callback
@@ -513,6 +519,7 @@ impl cosmic::Application for AppModel {
                 path,
                 editor_content,
                 markstate,
+                images,
                 is_dirty,
                 panes,
                 preview_state,
@@ -522,6 +529,7 @@ impl cosmic::Application for AppModel {
                 path,
                 editor_content,
                 markstate,
+                images,
                 is_dirty,
                 panes,
                 preview_state,
@@ -729,6 +737,8 @@ impl cosmic::Application for AppModel {
                     path: None,
                     editor_content: text_editor::Content::new(),
                     markstate: MarkState::with_html_and_markdown(""),
+                    images: HashMap::new(),
+                    images_in_progress: HashSet::new(),
                     is_dirty: true,
                     panes,
                     preview_state,
@@ -746,6 +756,8 @@ impl cosmic::Application for AppModel {
                     path: None,
                     editor_content: text_editor::Content::new(),
                     markstate: MarkState::with_html_and_markdown(""),
+                    images: HashMap::new(),
+                    images_in_progress: HashSet::new(),
                     is_dirty: true,
                     panes,
                     preview_state: PreviewState::Shown,
@@ -790,6 +802,8 @@ impl cosmic::Application for AppModel {
                     path: Some(file_path),
                     editor_content: text_editor::Content::new(),
                     markstate: MarkState::with_html_and_markdown(""),
+                    images: HashMap::new(),
+                    images_in_progress: HashSet::new(),
                     is_dirty: true,
                     panes,
                     preview_state: PreviewState::Shown,
@@ -876,16 +890,31 @@ impl cosmic::Application for AppModel {
                     let (mut panes, first_pane) = pane_grid::State::new(PaneContent::Editor);
                     panes.split(pane_grid::Axis::Vertical, first_pane, PaneContent::Preview);
 
+                    let markstate = MarkState::with_html_and_markdown(content.as_ref());
+                    let images_in_progress = HashSet::new();
+
                     self.state = State::Ready {
                         path: Some(path),
                         editor_content: text_editor::Content::with_text(content.as_ref()),
-                        markstate: MarkState::with_html_and_markdown(content.as_ref()),
+                        markstate,
+                        images: HashMap::new(),
+                        images_in_progress,
                         is_dirty: false,
                         panes,
                         preview_state: PreviewState::Shown,
                         history: vec![content.to_string()],
                         history_index: 0,
                     };
+
+                    if let State::Ready {
+                        markstate,
+                        images_in_progress,
+                        ..
+                    } = &mut self.state
+                    {
+                        return utils::images::download_images(markstate, images_in_progress);
+                    }
+
                     Task::none()
                 }
                 Err(e) => self.update(Message::AddToast(CedillaToast::new(e))),
@@ -895,6 +924,7 @@ impl cosmic::Application for AppModel {
                     editor_content,
                     is_dirty,
                     markstate,
+                    images_in_progress,
                     history,
                     history_index,
                     ..
@@ -923,7 +953,7 @@ impl cosmic::Application for AppModel {
                     }
                 }
 
-                Task::none()
+                utils::images::download_images(markstate, images_in_progress)
             }
             Message::FileSaved(result) => match result {
                 Ok(new_path) => {
@@ -1139,6 +1169,25 @@ impl cosmic::Application for AppModel {
                 }
                 Task::none()
             }
+            Message::ImageDownloaded(res) => {
+                let State::Ready { images, .. } = &mut self.state else {
+                    return Task::none();
+                };
+
+                match res {
+                    Ok(image) => {
+                        // Note: Ignoring `image.is_svg` for now.
+                        // See the `large_readme.rs` example for how
+                        // to handle SVG images.
+                        images.insert(image.url, image::Handle::from_bytes(image.bytes));
+                    }
+                    Err(err) => {
+                        eprintln!("Couldn't download image: {err}");
+                    }
+                }
+
+                Task::none()
+            }
             Message::SetPreviewState(desired_state) => {
                 let State::Ready { preview_state, .. } = &mut self.state else {
                     return Task::none();
@@ -1171,6 +1220,7 @@ impl cosmic::Application for AppModel {
                 let State::Ready {
                     editor_content,
                     markstate,
+                    images_in_progress,
                     is_dirty,
                     history,
                     history_index,
@@ -1187,12 +1237,14 @@ impl cosmic::Application for AppModel {
                     *markstate = MarkState::with_html_and_markdown(&snapshot);
                     *is_dirty = *history_index != 0;
                 }
-                Task::none()
+
+                utils::images::download_images(markstate, images_in_progress)
             }
             Message::Redo => {
                 let State::Ready {
                     editor_content,
                     markstate,
+                    images_in_progress,
                     history,
                     history_index,
                     ..
@@ -1207,7 +1259,8 @@ impl cosmic::Application for AppModel {
                     *editor_content = text_editor::Content::with_text(&snapshot);
                     *markstate = MarkState::with_html_and_markdown(&snapshot);
                 }
-                Task::none()
+
+                utils::images::download_images(markstate, images_in_progress)
             }
 
             #[allow(clippy::collapsible_if)]
@@ -1414,6 +1467,7 @@ fn cedilla_main_view<'a>(
     path: &'a Option<PathBuf>,
     editor_content: &'a text_editor::Content,
     markstate: &'a MarkState,
+    images: &'a HashMap<String, image::Handle>,
     is_dirty: &'a bool,
     panes: &'a pane_grid::State<PaneContent>,
     preview_state: &'a PreviewState,
@@ -1487,7 +1541,22 @@ fn cedilla_main_view<'a>(
                     scrollable(
                         MarkWidget::new(markstate)
                             .on_updating_state(Message::UpdateMarkState)
-                            .on_clicking_link(Message::LaunchUrl),
+                            .on_clicking_link(Message::LaunchUrl)
+                            .on_drawing_image(|info| {
+                                // TODO: SVGs
+                                if let Some(image) = images.get(info.url).cloned() {
+                                    let mut img = widget::image(image);
+                                    if let Some(w) = info.width {
+                                        img = img.width(w);
+                                    }
+                                    if let Some(h) = info.height {
+                                        img = img.height(h);
+                                    }
+                                    img.into()
+                                } else {
+                                    "...".into()
+                                }
+                            }),
                     )
                     .width(Length::Fill),
                 )
