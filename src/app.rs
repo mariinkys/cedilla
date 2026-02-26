@@ -5,14 +5,14 @@ use crate::app::context_page::ContextPage;
 use crate::app::core::project::ProjectNode;
 use crate::app::core::utils::{self, CedillaToast};
 use crate::app::dialogs::{DialogPage, DialogState};
-use crate::app::widgets::{TextEditor, markdown, text_editor};
+use crate::app::widgets::{TextEditor, text_editor};
 use crate::config::{AppTheme, BoolState, CedillaConfig, ConfigInput, ShowState};
 use crate::key_binds::key_binds;
 use crate::{fl, icons};
 use cosmic::app::context_drawer;
 use cosmic::iced::{Alignment, Event, Length, Padding, Subscription, highlighter, window};
 use cosmic::iced_core::keyboard::{Key, Modifiers};
-use cosmic::iced_widget::{center, column, row, sensor, tooltip};
+use cosmic::iced_widget::{center, column, row, tooltip};
 use cosmic::widget::menu::Action;
 use cosmic::widget::space::horizontal;
 use cosmic::widget::{self, about::About, menu};
@@ -21,11 +21,11 @@ use cosmic::widget::{
     segmented_button, text, toaster,
 };
 use cosmic::{prelude::*, surface, theme};
+use frostmark::{MarkState, MarkWidget, UpdateMsg};
 use slotmap::Key as SlotMapKey;
 use std::collections::{HashMap, VecDeque};
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
-use std::time::Duration;
 
 pub mod app_menu;
 mod context_page;
@@ -79,10 +79,8 @@ enum State {
         path: Option<PathBuf>,
         /// Text Editor Content
         editor_content: text_editor::Content,
-        /// Images in the markdown
-        markdown_images: HashMap<markdown::Url, ImageState>,
-        /// Markdown preview items
-        items: Vec<markdown::Item>,
+        /// Markdown Preview state
+        markstate: MarkState,
         /// Track if any changes have been made to the current file
         is_dirty: bool,
         /// Pane grid state
@@ -101,13 +99,6 @@ enum State {
 enum PaneContent {
     Editor,
     Preview,
-}
-
-/// State of the images in the markdown file
-enum ImageState {
-    Loading,
-    Ready(widget::image::Handle),
-    Failed,
 }
 
 /// State of the markdown preview in the app
@@ -173,16 +164,14 @@ pub enum Message {
     /// Callback after asking to move the vault
     VaultMoved(Result<PathBuf, anywho::Error>),
 
+    /// Update the HTML renderer state
+    UpdateMarkState(UpdateMsg),
     /// Set's the preview to the desired state
     SetPreviewState(PreviewState),
     /// Pane grid resized callback
     PaneResized(pane_grid::ResizeEvent),
     /// Pane grid dragged callback
     PaneDragged(pane_grid::DragEvent),
-    /// Triggered when an image becomes visible
-    ImageShown(markdown::Url),
-    /// Callback after downloading/loading an image
-    ImageLoaded(markdown::Url, Result<widget::image::Handle, String>),
     /// Apply formatting to selected text
     ApplyFormatting(utils::SelectionAction),
     /// Undo requested
@@ -194,37 +183,6 @@ pub enum Message {
     ConfigInput(ConfigInput),
     /// Callback after using asks to close the app
     AppCloseRequested,
-}
-
-struct MarkdownViewer<'a> {
-    images: &'a HashMap<markdown::Url, ImageState>,
-}
-
-impl<'a> markdown::Viewer<'a, cosmic::theme::Theme, cosmic::iced_widget::Renderer>
-    for MarkdownViewer<'a>
-{
-    fn image(
-        &self,
-        _settings: markdown::Settings,
-        url: &'a markdown::Url,
-        _title: &'a str,
-        _alt: &markdown::Text,
-    ) -> Element<'a, markdown::MarkdownMessage> {
-        match self.images.get(url) {
-            Some(ImageState::Ready(handle)) => widget::image(handle.clone())
-                .content_fit(cosmic::iced::ContentFit::Contain)
-                .width(Length::Shrink)
-                .height(Length::Shrink)
-                .into(),
-            Some(ImageState::Loading) => text("Loading image...").into(),
-            Some(ImageState::Failed) => text("Failed to load image").into(),
-            None => sensor(text("Loading..."))
-                .key_ref(url.as_str())
-                .delay(Duration::from_millis(500))
-                .on_show(|_size| markdown::MarkdownMessage::ImageShown(url.clone()))
-                .into(),
-        }
-    }
 }
 
 #[derive(Copy, Clone, Debug, Eq, PartialEq)]
@@ -554,8 +512,7 @@ impl cosmic::Application for AppModel {
             State::Ready {
                 path,
                 editor_content,
-                markdown_images,
-                items,
+                markstate,
                 is_dirty,
                 panes,
                 preview_state,
@@ -564,8 +521,7 @@ impl cosmic::Application for AppModel {
                 &self.config,
                 path,
                 editor_content,
-                markdown_images,
-                items,
+                markstate,
                 is_dirty,
                 panes,
                 preview_state,
@@ -772,8 +728,7 @@ impl cosmic::Application for AppModel {
                 self.state = State::Ready {
                     path: None,
                     editor_content: text_editor::Content::new(),
-                    markdown_images: HashMap::new(),
-                    items: vec![],
+                    markstate: MarkState::with_html_and_markdown(""),
                     is_dirty: true,
                     panes,
                     preview_state,
@@ -790,8 +745,7 @@ impl cosmic::Application for AppModel {
                 self.state = State::Ready {
                     path: None,
                     editor_content: text_editor::Content::new(),
-                    markdown_images: HashMap::new(),
-                    items: vec![],
+                    markstate: MarkState::with_html_and_markdown(""),
                     is_dirty: true,
                     panes,
                     preview_state: PreviewState::Shown,
@@ -835,8 +789,7 @@ impl cosmic::Application for AppModel {
                 self.state = State::Ready {
                     path: Some(file_path),
                     editor_content: text_editor::Content::new(),
-                    markdown_images: HashMap::new(),
-                    items: vec![],
+                    markstate: MarkState::with_html_and_markdown(""),
                     is_dirty: true,
                     panes,
                     preview_state: PreviewState::Shown,
@@ -926,8 +879,7 @@ impl cosmic::Application for AppModel {
                     self.state = State::Ready {
                         path: Some(path),
                         editor_content: text_editor::Content::with_text(content.as_ref()),
-                        markdown_images: HashMap::new(),
-                        items: markdown::parse(content.as_ref()).collect(),
+                        markstate: MarkState::with_html_and_markdown(content.as_ref()),
                         is_dirty: false,
                         panes,
                         preview_state: PreviewState::Shown,
@@ -942,7 +894,7 @@ impl cosmic::Application for AppModel {
                 let State::Ready {
                     editor_content,
                     is_dirty,
-                    items,
+                    markstate,
                     history,
                     history_index,
                     ..
@@ -953,7 +905,7 @@ impl cosmic::Application for AppModel {
 
                 let was_edit = action.is_edit();
                 editor_content.perform(action);
-                *items = markdown::parse(editor_content.text().as_ref()).collect();
+                *markstate = MarkState::with_html_and_markdown(editor_content.text().as_ref());
 
                 if was_edit {
                     *is_dirty = true;
@@ -1181,6 +1133,12 @@ impl cosmic::Application for AppModel {
                 }
             }
 
+            Message::UpdateMarkState(message) => {
+                if let State::Ready { markstate, .. } = &mut self.state {
+                    markstate.update(message)
+                }
+                Task::none()
+            }
             Message::SetPreviewState(desired_state) => {
                 let State::Ready { preview_state, .. } = &mut self.state else {
                     return Task::none();
@@ -1208,48 +1166,12 @@ impl cosmic::Application for AppModel {
             }
             Message::PaneDragged(_) => Task::none(),
 
-            Message::ImageShown(url) => {
-                let State::Ready {
-                    markdown_images, ..
-                } = &mut self.state
-                else {
-                    return Task::none();
-                };
-
-                if markdown_images.contains_key(&url) {
-                    return Task::none();
-                }
-
-                markdown_images.insert(url.clone(), ImageState::Loading);
-
-                let url_for_closure = url.clone();
-                Task::perform(utils::images::load_image(url), move |result| {
-                    cosmic::action::app(Message::ImageLoaded(url_for_closure.clone(), result))
-                })
-            }
-            Message::ImageLoaded(url, result) => {
-                let State::Ready {
-                    markdown_images, ..
-                } = &mut self.state
-                else {
-                    return Task::none();
-                };
-
-                let state = match result {
-                    Ok(handle) => ImageState::Ready(handle),
-                    Err(_) => ImageState::Failed,
-                };
-
-                markdown_images.insert(url, state);
-
-                Task::none()
-            }
             Message::ApplyFormatting(action) => self.apply_formatting_to_selection(action),
             Message::Undo => {
                 let State::Ready {
                     editor_content,
+                    markstate,
                     is_dirty,
-                    items,
                     history,
                     history_index,
                     ..
@@ -1262,7 +1184,7 @@ impl cosmic::Application for AppModel {
                     *history_index -= 1;
                     let snapshot = history[*history_index].clone();
                     *editor_content = text_editor::Content::with_text(&snapshot);
-                    *items = markdown::parse(&snapshot).collect();
+                    *markstate = MarkState::with_html_and_markdown(&snapshot);
                     *is_dirty = *history_index != 0;
                 }
                 Task::none()
@@ -1270,7 +1192,7 @@ impl cosmic::Application for AppModel {
             Message::Redo => {
                 let State::Ready {
                     editor_content,
-                    items,
+                    markstate,
                     history,
                     history_index,
                     ..
@@ -1283,7 +1205,7 @@ impl cosmic::Application for AppModel {
                     *history_index += 1;
                     let snapshot = history[*history_index].clone();
                     *editor_content = text_editor::Content::with_text(&snapshot);
-                    *items = markdown::parse(&snapshot).collect();
+                    *markstate = MarkState::with_html_and_markdown(&snapshot);
                 }
                 Task::none()
             }
@@ -1491,8 +1413,7 @@ fn cedilla_main_view<'a>(
     app_config: &'a CedillaConfig,
     path: &'a Option<PathBuf>,
     editor_content: &'a text_editor::Content,
-    markdown_images: &'a HashMap<url::Url, ImageState>,
-    items: &'a [markdown::Item],
+    markstate: &'a MarkState,
     is_dirty: &'a bool,
     panes: &'a pane_grid::State<PaneContent>,
     preview_state: &'a PreviewState,
@@ -1562,21 +1483,14 @@ fn cedilla_main_view<'a>(
 
             let pane_content: Element<'a, Message> = match content {
                 PaneContent::Editor => create_editor().into(),
-                PaneContent::Preview => container(scrollable(
-                    markdown::view_with(
-                        items,
-                        markdown::Settings::default(),
-                        &MarkdownViewer {
-                            images: markdown_images,
-                        },
+                PaneContent::Preview => container(
+                    scrollable(
+                        MarkWidget::new(markstate)
+                            .on_updating_state(Message::UpdateMarkState)
+                            .on_clicking_link(Message::LaunchUrl),
                     )
-                    .map(|m| match m {
-                        markdown::MarkdownMessage::LinkClicked(url) => {
-                            Message::LaunchUrl(url.to_string())
-                        }
-                        markdown::MarkdownMessage::ImageShown(url) => Message::ImageShown(url),
-                    }),
-                ))
+                    .width(Length::Fill),
+                )
                 .padding(spacing.space_xxs)
                 .width(Length::Fill)
                 .height(Length::Fill)
