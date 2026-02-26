@@ -127,7 +127,7 @@ impl DialogPage {
 
                             widget::button::custom(
                                 widget::row::with_children(vec![
-                                    widget::Space::new().width(indent_padding).into(),
+                                    widget::space::horizontal().width(indent_padding).into(),
                                     widget::icon::from_name("folder-symbolic").size(16).into(),
                                     widget::text::body(name.clone()).into(),
                                 ])

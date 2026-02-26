@@ -17,7 +17,7 @@ use cosmic::widget::menu::Action;
 use cosmic::widget::space::horizontal;
 use cosmic::widget::{self, about::About, menu};
 use cosmic::widget::{
-    Space, ToastId, Toasts, button, container, nav_bar, pane_grid, responsive, scrollable,
+    ToastId, Toasts, button, container, nav_bar, pane_grid, responsive, scrollable,
     segmented_button, text, toaster,
 };
 use cosmic::{prelude::*, surface, theme};
@@ -1632,14 +1632,14 @@ fn cedilla_main_view<'a>(
                     .on_press(Message::ApplyFormatting(utils::SelectionAction::Bold)),
                 button::icon(icons::get_handle("helperbar/italic-symbolic", 18))
                     .on_press(Message::ApplyFormatting(utils::SelectionAction::Italic)),
-                Space::new().width(18.).height(0.),
+                horizontal().width(18.),
                 button::icon(icons::get_handle("helperbar/link-symbolic", 18))
                     .on_press(Message::ApplyFormatting(utils::SelectionAction::Hyperlink)),
                 button::icon(icons::get_handle("helperbar/code-symbolic", 18))
                     .on_press(Message::ApplyFormatting(utils::SelectionAction::Code)),
                 button::icon(icons::get_handle("helperbar/image-symbolic", 18))
                     .on_press(Message::ApplyFormatting(utils::SelectionAction::Image)),
-                Space::new().width(18.).height(0.),
+                horizontal().width(18.),
                 button::icon(icons::get_handle("helperbar/bulleted-list-symbolic", 18)).on_press(
                     Message::ApplyFormatting(utils::SelectionAction::BulletedList)
                 ),
