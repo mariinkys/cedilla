@@ -30,6 +30,7 @@ impl<
         + widget::checkbox::Catalog
         + cosmic::widget::aspect_ratio::Catalog
         + cosmic::iced_widget::scrollable::Catalog
+        + cosmic::iced_widget::table::Catalog
         + 'a,
 > MarkWidget<'a, M, T>
 {
@@ -516,42 +517,48 @@ impl<
             }
         }
 
-        let make_cell = |content: RenderedSpan<'a, M, T>, align: Option<ChildAlignment>| {
-            let alignment: cosmic::iced::Alignment = align
-                .map(|a| a.into())
-                .unwrap_or(cosmic::iced::Alignment::Start);
+        let num_columns = header_cells.len();
+        if num_columns == 0 {
+            return RenderedSpan::None;
+        }
 
-            widget::container(
-                widget::column![content.render()]
-                    .width(cosmic::iced::Length::Shrink)
-                    .align_x(alignment),
-            )
-            .padding(5)
-            .width(cosmic::iced::Length::Shrink)
-        };
+        #[allow(clippy::type_complexity)]
+        let mut per_column: Vec<
+            Vec<std::cell::Cell<Option<cosmic::iced::Element<'a, M, T>>>>,
+        > = (0..num_columns).map(|_| Vec::new()).collect();
 
-        let header_row: cosmic::iced::Element<'a, M, T> =
-            widget::row(header_cells.into_iter().enumerate().map(|(i, cell)| {
-                make_cell(cell, column_alignments.get(i).copied().flatten()).into()
-            }))
-            .spacing(2)
-            .into();
+        for row in body_rows {
+            for (col_i, cell) in row.into_iter().enumerate() {
+                if col_i < num_columns {
+                    per_column[col_i].push(std::cell::Cell::new(Some(RenderedSpan::render(cell))));
+                }
+            }
+        }
 
-        let body: cosmic::iced::Element<'a, M, T> =
-            widget::column(body_rows.into_iter().map(|row| {
-                widget::row(row.into_iter().enumerate().map(|(i, cell)| {
-                    make_cell(cell, column_alignments.get(i).copied().flatten()).into()
-                }))
-                .spacing(2)
-                .into()
-            }))
-            .spacing(2)
-            .into();
+        let rendered_headers: Vec<cosmic::iced::Element<'a, M, T>> =
+            header_cells.into_iter().map(RenderedSpan::render).collect();
 
-        let table: cosmic::iced::Element<'a, M, T> =
-            widget::column![header_row, widget::rule::horizontal(1), body,]
-                .spacing(4)
-                .into();
+        let row_count = per_column.first().map(|c| c.len()).unwrap_or(0);
+
+        let columns = rendered_headers
+            .into_iter()
+            .zip(per_column)
+            .enumerate()
+            .map(|(col_i, (header, col_cells))| {
+                let align_x = match column_alignments.get(col_i).copied().flatten() {
+                    Some(ChildAlignment::Right) => cosmic::iced::alignment::Horizontal::Right,
+                    Some(ChildAlignment::Center) => cosmic::iced::alignment::Horizontal::Center,
+                    _ => cosmic::iced::alignment::Horizontal::Left,
+                };
+                cosmic::iced_widget::table::column(header, move |row_i: usize| {
+                    col_cells[row_i]
+                        .take()
+                        .unwrap_or_else(|| widget::Space::new().into())
+                })
+                .align_x(align_x)
+            });
+
+        let table = cosmic::iced_widget::table::table(columns, 0..row_count);
 
         widget::scrollable(table)
             .direction(Direction::Horizontal(Scrollbar::default()))
@@ -658,6 +665,7 @@ impl<
         + widget::checkbox::Catalog
         + cosmic::widget::aspect_ratio::Catalog
         + cosmic::iced_widget::scrollable::Catalog
+        + cosmic::iced_widget::table::Catalog
         + 'a,
 > From<MarkWidget<'a, M, T>> for Element<'a, M, T>
 {
