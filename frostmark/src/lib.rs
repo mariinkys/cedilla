@@ -13,5 +13,5 @@ mod style;
 mod widgets;
 
 pub use state::MarkState;
-pub use structs::{ImageInfo, MarkWidget, UpdateMsg};
+pub use structs::{ImageInfo, MarkWidget, RubyMode, UpdateMsg};
 pub use style::Style;

@@ -66,6 +66,7 @@ bitflags! {
         const MONOSPACE = 1 << 5;
         const SKIP_SUMMARY = 1 << 6;
         const HIGHLIGHT = 1 << 7;
+        const INSIDE_RUBY = 1 << 8;
     }
 }
 
@@ -125,6 +126,8 @@ pub struct MarkWidget<'a, Message, Theme = cosmic::iced::Theme> {
     pub(crate) paragraph_spacing: Option<f32>,
 
     pub(crate) current_dropdown_id: usize,
+
+    pub(crate) ruby_mode: RubyMode,
 }
 
 impl<'a, M: 'a, T: 'a> MarkWidget<'a, M, T> {
@@ -146,6 +149,7 @@ impl<'a, M: 'a, T: 'a> MarkWidget<'a, M, T> {
             text_size: 16.0,
             heading_scale: 1.0,
             paragraph_spacing: None,
+            ruby_mode: RubyMode::default(),
         }
     }
 
@@ -358,6 +362,17 @@ impl<'a, M: 'a, T: 'a> MarkWidget<'a, M, T> {
         self.paragraph_spacing = Some(spacing);
         self
     }
+
+    /// Controls the rendering behavior of ruby annotations.
+    ///
+    /// By default, annotations are rendered with proper layout.
+    /// Use [`RubyMode::Fallback`] for basic inline rendering (performance),
+    /// or [`RubyMode::Ignore`] to only render the base text.
+    #[must_use]
+    pub fn ruby_mode(mut self, mode: RubyMode) -> Self {
+        self.ruby_mode = mode;
+        self
+    }
 }
 
 #[derive(Default)]
@@ -492,4 +507,16 @@ pub struct ImageInfo<'a> {
     pub url: &'a str,
     pub width: Option<f32>,
     pub height: Option<f32>,
+}
+
+/// Controls how ruby annotations are rendered.
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
+pub enum RubyMode {
+    /// Layout horizontally with proper annotation support
+    #[default]
+    Full,
+    /// Primitive inline layout, for better performance
+    Fallback,
+    /// Ignore ruby annotations entirely
+    Ignore,
 }
