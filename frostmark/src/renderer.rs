@@ -166,7 +166,14 @@ impl<'a, M: Clone + 'static, T: ValidTheme + 'a> MarkWidget<'a, M, T> {
             "del" | "s" | "strike" => {
                 self.render_children(node, data.insert(ChildDataFlags::STRIKETHROUGH))
             }
-            "code" => self.render_children(node, data.insert(ChildDataFlags::MONOSPACE)),
+            "code" => {
+                self.current_code_language = get_attr(&attrs, "class")
+                    .and_then(|c| c.strip_prefix("language-"))
+                    .map(str::to_owned);
+                let result = self.render_children(node, data.insert(ChildDataFlags::MONOSPACE));
+                self.current_code_language = None;
+                result
+            }
             "mark" => self.render_children(node, data.insert(ChildDataFlags::HIGHLIGHT)),
 
             "details" => self.draw_details(node, data),
@@ -458,16 +465,23 @@ impl<'a, M: Clone + 'static, T: ValidTheme + 'a> MarkWidget<'a, M, T> {
             self.state.selection_state.get(&code),
             self.fn_update.clone(),
         ) {
-            widget::text_editor(state)
+            let on_action = move |action| {
+                select(UpdateMsg {
+                    kind: UpdateMsgKind::TextEditor(code.clone(), action),
+                })
+            };
+
+            let editor = widget::text_editor(state)
                 .size(size)
                 .padding(5)
                 .font(self.font_mono)
-                .on_action(move |action| {
-                    select(UpdateMsg {
-                        kind: UpdateMsgKind::TextEditor(code.clone(), action),
-                    })
-                })
-                .into()
+                .on_action(on_action);
+
+            if let Some(language) = &self.current_code_language {
+                editor.highlight(language, self.code_highlight_theme).into()
+            } else {
+                editor.into()
+            }
         } else {
             RenderedSpan::Spans(vec![widget::span(code).size(size).font(self.font_mono)])
         }

@@ -1542,6 +1542,7 @@ fn cedilla_main_view<'a>(
                         MarkWidget::new(markstate)
                             .on_updating_state(Message::UpdateMarkState)
                             .on_clicking_link(Message::LaunchUrl)
+                            .code_highlight_theme(cosmic::iced::highlighter::Theme::InspiredGitHub)
                             .on_drawing_image(|info| {
                                 // TODO: SVGs
                                 if let Some(image) = images.get(info.url).cloned() {

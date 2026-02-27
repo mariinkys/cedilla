@@ -128,6 +128,9 @@ pub struct MarkWidget<'a, Message, Theme = cosmic::iced::Theme> {
     pub(crate) current_dropdown_id: usize,
 
     pub(crate) ruby_mode: RubyMode,
+
+    pub(crate) current_code_language: Option<String>,
+    pub(crate) code_highlight_theme: cosmic::iced::highlighter::Theme,
 }
 
 impl<'a, M: 'a, T: 'a> MarkWidget<'a, M, T> {
@@ -150,6 +153,8 @@ impl<'a, M: 'a, T: 'a> MarkWidget<'a, M, T> {
             heading_scale: 1.0,
             paragraph_spacing: None,
             ruby_mode: RubyMode::default(),
+            current_code_language: None,
+            code_highlight_theme: cosmic::iced::highlighter::Theme::InspiredGitHub,
         }
     }
 
@@ -371,6 +376,13 @@ impl<'a, M: 'a, T: 'a> MarkWidget<'a, M, T> {
     #[must_use]
     pub fn ruby_mode(mut self, mode: RubyMode) -> Self {
         self.ruby_mode = mode;
+        self
+    }
+
+    /// Sets the syntax highlighting theme for code blocks.
+    #[must_use]
+    pub fn code_highlight_theme(mut self, theme: cosmic::iced::highlighter::Theme) -> Self {
+        self.code_highlight_theme = theme;
         self
     }
 }
