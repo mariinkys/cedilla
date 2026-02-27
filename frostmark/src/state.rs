@@ -130,10 +130,10 @@ impl MarkState {
     pub fn update(&mut self, action: UpdateMsg) {
         match action.kind {
             UpdateMsgKind::TextEditor(code, action) => {
-                if !action.is_edit() {
-                    if let Some(n) = self.selection_state.get_mut(&code) {
-                        n.perform(action);
-                    }
+                if !action.is_edit()
+                    && let Some(n) = self.selection_state.get_mut(&code)
+                {
+                    n.perform(action);
                 }
             }
             UpdateMsgKind::DetailsToggle(id, action) => {

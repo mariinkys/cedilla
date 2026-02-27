@@ -193,11 +193,12 @@ impl<'a, M: 'a, T: 'a> MarkWidget<'a, M, T> {
     /// For reference, in scale 1.0, `<h1>` headings are 1.8x bigger than regular text.
     #[must_use]
     pub fn heading_scale(mut self, scale: f32) -> Self {
-        assert!(scale >= 0.0);
-        self.heading_scale = scale;
+        debug_assert!(scale >= 0.0);
+        if scale >= 0.0 {
+            self.heading_scale = scale;
+        }
         self
     }
-
     /// When clicking a link, send a message to handle it.
     ///
     /// ```no_run

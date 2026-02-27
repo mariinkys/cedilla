@@ -4,7 +4,7 @@
 // I've only adapted it to work with libcosmic
 //
 
-use cosmic::iced::{Element, Font, Padding, widget};
+use cosmic::iced::{Element, Font, Length, Padding, widget};
 use markup5ever_rcdom::{Node, NodeData};
 
 use crate::{
@@ -17,18 +17,30 @@ use crate::{
 
 use super::structs::ChildData;
 
-impl<
-    'a,
-    M: Clone + 'static,
+mod table;
+
+// Add everything to one place
+pub trait ValidTheme:
+    widget::button::Catalog
+    + widget::text::Catalog
+    + widget::rule::Catalog
+    + widget::text_editor::Catalog
+    + widget::checkbox::Catalog
+    + widget::container::Catalog
+{
+}
+
+impl<T> ValidTheme for T where
     T: widget::button::Catalog
         + widget::text::Catalog
         + widget::rule::Catalog
         + widget::text_editor::Catalog
         + widget::checkbox::Catalog
-        + cosmic::widget::aspect_ratio::Catalog
-        + 'a,
-> MarkWidget<'a, M, T>
+        + widget::container::Catalog
 {
+}
+
+impl<'a, M: Clone + 'static, T: ValidTheme + 'a> MarkWidget<'a, M, T> {
     pub(crate) fn traverse_node(&mut self, node: &Node, data: ChildData) -> RenderedSpan<'a, M, T> {
         match &node.data {
             markup5ever_rcdom::NodeData::Document => self.render_children(node, data),
@@ -201,7 +213,7 @@ impl<
         if let (true, Some(align)) = (block_element, data.alignment) {
             let align: cosmic::iced::Alignment = align.into();
             widget::column![e.render()]
-                .width(cosmic::iced::Length::Fill)
+                .width(Length::Fill)
                 .align_x(align)
                 .into()
         } else {
@@ -372,14 +384,16 @@ impl<
             if is_node_useless(item) {
                 continue;
             }
-            if let NodeData::Element { name, .. } = &item.data {
-                if !skipped_summary
-                    && data.flags.contains(ChildDataFlags::SKIP_SUMMARY)
-                    && &*name.local == "summary"
-                {
-                    skipped_summary = true;
-                    continue;
-                }
+
+            if let NodeData::Element { name, .. } = &item.data
+                && !skipped_summary
+                && data.flags.contains(ChildDataFlags::SKIP_SUMMARY)
+                && &*name.local == "summary"
+            {
+                // Skip the first <summary> inside <details>
+                // as it's already drawn
+                skipped_summary = true;
+                continue;
             }
 
             let mut data = data;
@@ -445,223 +459,6 @@ impl<
         } else {
             RenderedSpan::Spans(vec![widget::span(code).size(size).font(self.font_mono)])
         }
-    }
-
-    // fn draw_table(&mut self, node: &Node, data: ChildData) -> RenderedSpan<'a, M, T> {
-    //     let mut header_cells: Vec<RenderedSpan<'a, M, T>> = Vec::new();
-    //     let mut column_alignments: Vec<Option<ChildAlignment>> = Vec::new();
-    //     let mut body_rows: Vec<Vec<RenderedSpan<'a, M, T>>> = Vec::new();
-
-    //     let children = node.children.borrow();
-    //     for section in children.iter() {
-    //         let NodeData::Element { name, .. } = &section.data else {
-    //             continue;
-    //         };
-    //         let section_name = name.local.to_string();
-
-    //         let rows = section.children.borrow();
-    //         for row in rows.iter() {
-    //             let NodeData::Element { name, .. } = &row.data else {
-    //                 continue;
-    //             };
-    //             if name.local.to_string() != "tr" {
-    //                 continue;
-    //             }
-
-    //             let row_children = row.children.borrow();
-    //             let cells: Vec<_> = row_children
-    //                 .iter()
-    //                 .filter(|cell| {
-    //                     matches!(
-    //                         &cell.data,
-    //                         NodeData::Element { name, .. }
-    //                             if matches!(name.local.to_string().as_str(), "th" | "td")
-    //                     )
-    //                 })
-    //                 .collect();
-
-    //             if section_name == "thead" || (header_cells.is_empty() && body_rows.is_empty()) {
-    //                 column_alignments = cells
-    //                     .iter()
-    //                     .map(|cell| {
-    //                         if let NodeData::Element { attrs, .. } = &cell.data {
-    //                             let attrs = attrs.borrow();
-    //                             match get_attr(&attrs, "align") {
-    //                                 Some("right") => Some(ChildAlignment::Right),
-    //                                 Some("center") | Some("centre") => Some(ChildAlignment::Center),
-    //                                 _ => None,
-    //                             }
-    //                         } else {
-    //                             None
-    //                         }
-    //                     })
-    //                     .collect();
-
-    //                 header_cells = cells
-    //                     .iter()
-    //                     .map(|cell| self.render_children(cell, data.insert(ChildDataFlags::BOLD)))
-    //                     .collect();
-    //             } else {
-    //                 body_rows.push(
-    //                     cells
-    //                         .iter()
-    //                         .map(|cell| self.render_children(cell, data))
-    //                         .collect(),
-    //                 );
-    //             }
-    //         }
-    //     }
-
-    //     let num_columns = header_cells.len();
-    //     if num_columns == 0 {
-    //         return RenderedSpan::None;
-    //     }
-
-    //     #[allow(clippy::type_complexity)]
-    //     let mut per_column: Vec<
-    //         Vec<std::cell::Cell<Option<cosmic::iced::Element<'a, M, T>>>>,
-    //     > = (0..num_columns).map(|_| Vec::new()).collect();
-
-    //     for row in body_rows {
-    //         for (col_i, cell) in row.into_iter().enumerate() {
-    //             if col_i < num_columns {
-    //                 per_column[col_i].push(std::cell::Cell::new(Some(RenderedSpan::render(cell))));
-    //             }
-    //         }
-    //     }
-
-    //     let rendered_headers: Vec<cosmic::iced::Element<'a, M, T>> =
-    //         header_cells.into_iter().map(RenderedSpan::render).collect();
-
-    //     let row_count = per_column.first().map(|c| c.len()).unwrap_or(0);
-
-    //     let columns = rendered_headers
-    //         .into_iter()
-    //         .zip(per_column)
-    //         .enumerate()
-    //         .map(|(col_i, (header, col_cells))| {
-    //             let align_x = match column_alignments.get(col_i).copied().flatten() {
-    //                 Some(ChildAlignment::Right) => cosmic::iced::alignment::Horizontal::Right,
-    //                 Some(ChildAlignment::Center) => cosmic::iced::alignment::Horizontal::Center,
-    //                 _ => cosmic::iced::alignment::Horizontal::Left,
-    //             };
-    //             cosmic::iced_widget::table::column(header, move |row_i: usize| {
-    //                 col_cells[row_i]
-    //                     .take()
-    //                     .unwrap_or_else(|| widget::Space::new().into())
-    //             })
-    //             .align_x(align_x)
-    //         });
-
-    //     let table = cosmic::iced_widget::table::table(columns, 0..row_count);
-
-    //     widget::scrollable(table)
-    //         .direction(Direction::Horizontal(Scrollbar::default()))
-    //         .width(cosmic::iced::Length::Fill)
-    //         .spacing(3.)
-    //         .into()
-    // }
-
-    fn draw_table(&mut self, node: &Node, data: ChildData) -> RenderedSpan<'a, M, T> {
-        let mut header_cells: Vec<RenderedSpan<'a, M, T>> = Vec::new();
-        let mut column_alignments: Vec<Option<ChildAlignment>> = Vec::new();
-        let mut body_rows: Vec<Vec<RenderedSpan<'a, M, T>>> = Vec::new();
-
-        let children = node.children.borrow();
-        for section in children.iter() {
-            let NodeData::Element { name, .. } = &section.data else {
-                continue;
-            };
-            let section_name = name.local.to_string();
-
-            let rows = section.children.borrow();
-            for row in rows.iter() {
-                let NodeData::Element { name, .. } = &row.data else {
-                    continue;
-                };
-                if name.local.to_string() != "tr" {
-                    continue;
-                }
-
-                let row_children = row.children.borrow();
-                let cells: Vec<_> = row_children
-                    .iter()
-                    .filter(|cell| {
-                        matches!(
-                            &cell.data,
-                            NodeData::Element { name, .. }
-                                if matches!(name.local.to_string().as_str(), "th" | "td")
-                        )
-                    })
-                    .collect();
-
-                if section_name == "thead" || (header_cells.is_empty() && body_rows.is_empty()) {
-                    column_alignments = cells
-                        .iter()
-                        .map(|cell| {
-                            if let NodeData::Element { attrs, .. } = &cell.data {
-                                let attrs = attrs.borrow();
-                                match get_attr(&attrs, "align") {
-                                    Some("right") => Some(ChildAlignment::Right),
-                                    Some("center") | Some("centre") => Some(ChildAlignment::Center),
-                                    _ => None,
-                                }
-                            } else {
-                                None
-                            }
-                        })
-                        .collect();
-
-                    header_cells = cells
-                        .iter()
-                        .map(|cell| self.render_children(cell, data.insert(ChildDataFlags::BOLD)))
-                        .collect();
-                } else {
-                    body_rows.push(
-                        cells
-                            .iter()
-                            .map(|cell| self.render_children(cell, data))
-                            .collect(),
-                    );
-                }
-            }
-        }
-
-        let make_cell = |content: RenderedSpan<'a, M, T>, align: Option<ChildAlignment>| {
-            let alignment: cosmic::iced::Alignment = align
-                .map(|a| a.into())
-                .unwrap_or(cosmic::iced::Alignment::Start);
-
-            widget::container(
-                widget::column![content.render()]
-                    .width(cosmic::iced::Length::Fill)
-                    .align_x(alignment),
-            )
-            .padding(5)
-            .width(cosmic::iced::Length::Fill)
-        };
-
-        let header_row: cosmic::iced::Element<'a, M, T> =
-            widget::row(header_cells.into_iter().enumerate().map(|(i, cell)| {
-                make_cell(cell, column_alignments.get(i).copied().flatten()).into()
-            }))
-            .spacing(2)
-            .into();
-
-        let body: cosmic::iced::Element<'a, M, T> =
-            widget::column(body_rows.into_iter().map(|row| {
-                widget::row(row.into_iter().enumerate().map(|(i, cell)| {
-                    make_cell(cell, column_alignments.get(i).copied().flatten()).into()
-                }))
-                .spacing(2)
-                .into()
-            }))
-            .spacing(2)
-            .into();
-
-        widget::column![header_row, widget::rule::horizontal(1), body,]
-            .spacing(4)
-            .into()
     }
 }
 
@@ -748,22 +545,12 @@ fn is_block_element(node: &Node) -> bool {
             | "ul"
             | "video"
             | "br"
+            | "details"
             | "summary" // not really block but acts like it
     )
 }
 
-impl<
-    'a,
-    M: Clone + 'static,
-    T: widget::button::Catalog
-        + widget::text::Catalog
-        + widget::rule::Catalog
-        + widget::text_editor::Catalog
-        + widget::checkbox::Catalog
-        + cosmic::widget::aspect_ratio::Catalog
-        + 'a,
-> From<MarkWidget<'a, M, T>> for Element<'a, M, T>
-{
+impl<'a, M: Clone + 'static, T: ValidTheme + 'a> From<MarkWidget<'a, M, T>> for Element<'a, M, T> {
     fn from(mut value: MarkWidget<'a, M, T>) -> Self {
         let node = &value.state.dom.document;
         value.traverse_node(node, ChildData::default()).render()
@@ -772,15 +559,17 @@ impl<
 
 fn clean_whitespace(input: &str) -> String {
     let mut s = input.split_whitespace().collect::<Vec<&str>>().join(" ");
-    if let Some(last) = input.chars().last() {
-        if last.is_whitespace() && last != '\n' {
-            s.push(last);
-        }
+    if let Some(last) = input.chars().next_back()
+        && last != '\n'
+        && last.is_whitespace()
+    {
+        s.push(last);
     }
-    if let Some(first) = input.chars().next() {
-        if first.is_whitespace() && first != '\n' {
-            s.insert(0, first);
-        }
+    if let Some(first) = input.chars().next()
+        && first != '\n'
+        && first.is_whitespace()
+    {
+        s.insert(0, first);
     }
     s
 }
