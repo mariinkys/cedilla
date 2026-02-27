@@ -27,7 +27,6 @@ pub trait ValidTheme:
     + widget::rule::Catalog
     + widget::text_editor::Catalog
     + widget::checkbox::Catalog
-    + widget::container::Catalog
 {
 }
 
@@ -37,7 +36,6 @@ impl<T> ValidTheme for T where
         + widget::rule::Catalog
         + widget::text_editor::Catalog
         + widget::checkbox::Catalog
-        + widget::container::Catalog
 {
 }
 
