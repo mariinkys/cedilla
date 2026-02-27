@@ -146,6 +146,9 @@ impl<'a, M: Clone + 'static, T: ValidTheme + 'a> MarkWidget<'a, M, T> {
             "h5" => self.render_children(node, data.heading(5)),
             "h6" => self.render_children(node, data.heading(6)),
             "sub" => self.render_children(node, data.heading(7)),
+            "sup" => RenderedSpan::Spans(vec![
+                widget::span(to_superscript(&extract_text(node))).size(self.text_size),
+            ]),
             "rt" => self.render_children(node, data.heading(7).insert(ChildDataFlags::INSIDE_RUBY)),
 
             "blockquote" => widget::stack!(
@@ -577,4 +580,89 @@ fn clean_whitespace(input: &str) -> String {
         s.insert(0, first);
     }
     s
+}
+
+fn to_superscript(s: &str) -> String {
+    s.chars()
+        .map(|c| match c {
+            // Digits
+            '0' => '⁰',
+            '1' => '¹',
+            '2' => '²',
+            '3' => '³',
+            '4' => '⁴',
+            '5' => '⁵',
+            '6' => '⁶',
+            '7' => '⁷',
+            '8' => '⁸',
+            '9' => '⁹',
+            // Operators
+            '+' => '⁺',
+            '-' => '⁻',
+            '=' => '⁼',
+            '(' => '⁽',
+            ')' => '⁾',
+            // Lowercase letters
+            'a' => 'ᵃ',
+            'b' => 'ᵇ',
+            'c' => 'ᶜ',
+            'd' => 'ᵈ',
+            'e' => 'ᵉ',
+            'f' => 'ᶠ',
+            'g' => 'ᵍ',
+            'h' => 'ʰ',
+            'i' => 'ⁱ',
+            'j' => 'ʲ',
+            'k' => 'ᵏ',
+            'l' => 'ˡ',
+            'm' => 'ᵐ',
+            'n' => 'ⁿ',
+            'o' => 'ᵒ',
+            'p' => 'ᵖ',
+            'r' => 'ʳ',
+            's' => 'ˢ',
+            't' => 'ᵗ',
+            'u' => 'ᵘ',
+            'v' => 'ᵛ',
+            'w' => 'ʷ',
+            'x' => 'ˣ',
+            'y' => 'ʸ',
+            'z' => 'ᶻ',
+            // Uppercase letters (not all exist in Unicode)
+            'A' => 'ᴬ',
+            'B' => 'ᴮ',
+            'D' => 'ᴰ',
+            'E' => 'ᴱ',
+            'G' => 'ᴳ',
+            'H' => 'ᴴ',
+            'I' => 'ᴵ',
+            'J' => 'ᴶ',
+            'K' => 'ᴷ',
+            'L' => 'ᴸ',
+            'M' => 'ᴹ',
+            'N' => 'ᴺ',
+            'O' => 'ᴼ',
+            'P' => 'ᴾ',
+            'R' => 'ᴿ',
+            'T' => 'ᵀ',
+            'U' => 'ᵁ',
+            'V' => 'ⱽ',
+            'W' => 'ᵂ',
+            // No Unicode superscript exists for: C F Q S X Y Z (uppercase)
+            // and q (lowercase) — these fall through unchanged
+            _ => c,
+        })
+        .collect()
+}
+
+fn extract_text(node: &Node) -> String {
+    let mut result = String::new();
+    for child in node.children.borrow().iter() {
+        if let NodeData::Text { contents } = &child.data {
+            result.push_str(&contents.borrow());
+        } else {
+            result.push_str(&extract_text(child));
+        }
+    }
+    result
 }
