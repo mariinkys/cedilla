@@ -464,9 +464,9 @@ dependencies = [
 
 [[package]]
 name = "auto_enums"
-version = "0.8.7"
+version = "0.8.8"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "9c170965892137a3a9aeb000b4524aa3cc022a310e709d848b6e1cdce4ab4781"
+checksum = "65398a2893f41bce5c9259f6e1a4f03fbae40637c1bdc755b4f387f48c613b03"
 dependencies = [
  "derive_utils",
  "proc-macro2",
@@ -586,7 +586,7 @@ version = "0.6.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "cdeb9d870516001442e364c5220d3574d2da8dc765554b4a617230d33fa58ef5"
 dependencies = [
- "objc2 0.6.3",
+ "objc2 0.6.4",
 ]
 
 [[package]]
@@ -1022,7 +1022,7 @@ dependencies = [
 [[package]]
 name = "cosmic-config"
 version = "1.0.0"
-source = "git+https://github.com/pop-os/libcosmic.git?branch=iced-rebase#dba227086e020caba31be7814f5bab98e3ef01f0"
+source = "git+https://github.com/pop-os/libcosmic.git?branch=iced-rebase#86f05cd48a0c2eaed040a46647e250ec51c7f1bd"
 dependencies = [
  "atomicwrites",
  "cosmic-config-derive",
@@ -1043,7 +1043,7 @@ dependencies = [
 [[package]]
 name = "cosmic-config-derive"
 version = "1.0.0"
-source = "git+https://github.com/pop-os/libcosmic.git?branch=iced-rebase#dba227086e020caba31be7814f5bab98e3ef01f0"
+source = "git+https://github.com/pop-os/libcosmic.git?branch=iced-rebase#86f05cd48a0c2eaed040a46647e250ec51c7f1bd"
 dependencies = [
  "quote",
  "syn",
@@ -1102,7 +1102,7 @@ dependencies = [
 [[package]]
 name = "cosmic-text"
 version = "0.18.2"
-source = "git+https://github.com/pop-os/cosmic-text.git#b0884c0ab1691c01a0cd454323172399d6ccd93b"
+source = "git+https://github.com/pop-os/cosmic-text.git#29034e56b47b7e259f9a18a01fcda8ff267fc2d1"
 dependencies = [
  "bitflags 2.11.0",
  "fontdb",
@@ -1125,7 +1125,7 @@ dependencies = [
 [[package]]
 name = "cosmic-theme"
 version = "1.0.0"
-source = "git+https://github.com/pop-os/libcosmic.git?branch=iced-rebase#dba227086e020caba31be7814f5bab98e3ef01f0"
+source = "git+https://github.com/pop-os/libcosmic.git?branch=iced-rebase#86f05cd48a0c2eaed040a46647e250ec51c7f1bd"
 dependencies = [
  "almost",
  "configparser",
@@ -1304,9 +1304,9 @@ dependencies = [
 
 [[package]]
 name = "derive_utils"
-version = "0.15.0"
+version = "0.15.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "ccfae181bab5ab6c5478b2ccb69e4c68a02f8c3ec72f6616bfec9dbc599d2ee0"
+checksum = "362f47930db19fe7735f527e6595e4900316b893ebf6d48ad3d31be928d57dd6"
 dependencies = [
  "proc-macro2",
  "quote",
@@ -1346,14 +1346,14 @@ dependencies = [
 
 [[package]]
 name = "dispatch2"
-version = "0.3.0"
+version = "0.3.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "89a09f22a6c6069a18470eb92d2298acf25463f14256d24778e1230d789a2aec"
+checksum = "1e0e367e4e7da84520dedcac1901e4da967309406d1e51017ae1abfb97adbd38"
 dependencies = [
  "bitflags 2.11.0",
  "block2 0.6.2",
  "libc",
- "objc2 0.6.3",
+ "objc2 0.6.4",
 ]
 
 [[package]]
@@ -2367,7 +2367,7 @@ dependencies = [
 [[package]]
 name = "iced"
 version = "0.14.0"
-source = "git+https://github.com/pop-os/libcosmic.git?branch=iced-rebase#dba227086e020caba31be7814f5bab98e3ef01f0"
+source = "git+https://github.com/pop-os/libcosmic.git?branch=iced-rebase#86f05cd48a0c2eaed040a46647e250ec51c7f1bd"
 dependencies = [
  "dnd",
  "iced_accessibility",
@@ -2389,7 +2389,7 @@ dependencies = [
 [[package]]
 name = "iced_accessibility"
 version = "0.1.0"
-source = "git+https://github.com/pop-os/libcosmic.git?branch=iced-rebase#dba227086e020caba31be7814f5bab98e3ef01f0"
+source = "git+https://github.com/pop-os/libcosmic.git?branch=iced-rebase#86f05cd48a0c2eaed040a46647e250ec51c7f1bd"
 dependencies = [
  "accesskit",
  "accesskit_winit",
@@ -2398,7 +2398,7 @@ dependencies = [
 [[package]]
 name = "iced_core"
 version = "0.14.0"
-source = "git+https://github.com/pop-os/libcosmic.git?branch=iced-rebase#dba227086e020caba31be7814f5bab98e3ef01f0"
+source = "git+https://github.com/pop-os/libcosmic.git?branch=iced-rebase#86f05cd48a0c2eaed040a46647e250ec51c7f1bd"
 dependencies = [
  "bitflags 2.11.0",
  "bytes",
@@ -2423,7 +2423,7 @@ dependencies = [
 [[package]]
 name = "iced_debug"
 version = "0.14.0"
-source = "git+https://github.com/pop-os/libcosmic.git?branch=iced-rebase#dba227086e020caba31be7814f5bab98e3ef01f0"
+source = "git+https://github.com/pop-os/libcosmic.git?branch=iced-rebase#86f05cd48a0c2eaed040a46647e250ec51c7f1bd"
 dependencies = [
  "iced_core",
  "iced_futures",
@@ -2433,7 +2433,7 @@ dependencies = [
 [[package]]
 name = "iced_futures"
 version = "0.14.0"
-source = "git+https://github.com/pop-os/libcosmic.git?branch=iced-rebase#dba227086e020caba31be7814f5bab98e3ef01f0"
+source = "git+https://github.com/pop-os/libcosmic.git?branch=iced-rebase#86f05cd48a0c2eaed040a46647e250ec51c7f1bd"
 dependencies = [
  "futures",
  "iced_core",
@@ -2447,7 +2447,7 @@ dependencies = [
 [[package]]
 name = "iced_graphics"
 version = "0.14.0"
-source = "git+https://github.com/pop-os/libcosmic.git?branch=iced-rebase#dba227086e020caba31be7814f5bab98e3ef01f0"
+source = "git+https://github.com/pop-os/libcosmic.git?branch=iced-rebase#86f05cd48a0c2eaed040a46647e250ec51c7f1bd"
 dependencies = [
  "bitflags 2.11.0",
  "bytemuck",
@@ -2468,7 +2468,7 @@ dependencies = [
 [[package]]
 name = "iced_highlighter"
 version = "0.14.0"
-source = "git+https://github.com/pop-os/libcosmic.git?branch=iced-rebase#dba227086e020caba31be7814f5bab98e3ef01f0"
+source = "git+https://github.com/pop-os/libcosmic.git?branch=iced-rebase#86f05cd48a0c2eaed040a46647e250ec51c7f1bd"
 dependencies = [
  "iced_core",
  "two-face",
@@ -2477,7 +2477,7 @@ dependencies = [
 [[package]]
 name = "iced_program"
 version = "0.14.0"
-source = "git+https://github.com/pop-os/libcosmic.git?branch=iced-rebase#dba227086e020caba31be7814f5bab98e3ef01f0"
+source = "git+https://github.com/pop-os/libcosmic.git?branch=iced-rebase#86f05cd48a0c2eaed040a46647e250ec51c7f1bd"
 dependencies = [
  "iced_graphics",
  "iced_runtime",
@@ -2486,7 +2486,7 @@ dependencies = [
 [[package]]
 name = "iced_renderer"
 version = "0.14.0"
-source = "git+https://github.com/pop-os/libcosmic.git?branch=iced-rebase#dba227086e020caba31be7814f5bab98e3ef01f0"
+source = "git+https://github.com/pop-os/libcosmic.git?branch=iced-rebase#86f05cd48a0c2eaed040a46647e250ec51c7f1bd"
 dependencies = [
  "iced_graphics",
  "iced_tiny_skia",
@@ -2498,7 +2498,7 @@ dependencies = [
 [[package]]
 name = "iced_runtime"
 version = "0.14.0"
-source = "git+https://github.com/pop-os/libcosmic.git?branch=iced-rebase#dba227086e020caba31be7814f5bab98e3ef01f0"
+source = "git+https://github.com/pop-os/libcosmic.git?branch=iced-rebase#86f05cd48a0c2eaed040a46647e250ec51c7f1bd"
 dependencies = [
  "bytes",
  "cosmic-client-toolkit 0.2.0",
@@ -2514,7 +2514,7 @@ dependencies = [
 [[package]]
 name = "iced_tiny_skia"
 version = "0.14.0"
-source = "git+https://github.com/pop-os/libcosmic.git?branch=iced-rebase#dba227086e020caba31be7814f5bab98e3ef01f0"
+source = "git+https://github.com/pop-os/libcosmic.git?branch=iced-rebase#86f05cd48a0c2eaed040a46647e250ec51c7f1bd"
 dependencies = [
  "bytemuck",
  "cosmic-text",
@@ -2531,7 +2531,7 @@ dependencies = [
 [[package]]
 name = "iced_wgpu"
 version = "0.14.0"
-source = "git+https://github.com/pop-os/libcosmic.git?branch=iced-rebase#dba227086e020caba31be7814f5bab98e3ef01f0"
+source = "git+https://github.com/pop-os/libcosmic.git?branch=iced-rebase#86f05cd48a0c2eaed040a46647e250ec51c7f1bd"
 dependencies = [
  "as-raw-xcb-connection",
  "bitflags 2.11.0",
@@ -2562,7 +2562,7 @@ dependencies = [
 [[package]]
 name = "iced_widget"
 version = "0.14.2"
-source = "git+https://github.com/pop-os/libcosmic.git?branch=iced-rebase#dba227086e020caba31be7814f5bab98e3ef01f0"
+source = "git+https://github.com/pop-os/libcosmic.git?branch=iced-rebase#86f05cd48a0c2eaed040a46647e250ec51c7f1bd"
 dependencies = [
  "cosmic-client-toolkit 0.2.0",
  "dnd",
@@ -2582,7 +2582,7 @@ dependencies = [
 [[package]]
 name = "iced_winit"
 version = "0.14.0"
-source = "git+https://github.com/pop-os/libcosmic.git?branch=iced-rebase#dba227086e020caba31be7814f5bab98e3ef01f0"
+source = "git+https://github.com/pop-os/libcosmic.git?branch=iced-rebase#86f05cd48a0c2eaed040a46647e250ec51c7f1bd"
 dependencies = [
  "cosmic-client-toolkit 0.2.0",
  "cursor-icon",
@@ -2946,9 +2946,9 @@ dependencies = [
 
 [[package]]
 name = "js-sys"
-version = "0.3.90"
+version = "0.3.91"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "14dc6f6450b3f6d4ed5b16327f38fed626d375a886159ca555bd7822c0c3a5a6"
+checksum = "b49715b7073f385ba4bc528e5747d02e66cb39c6146efb66b781f131f0fb399c"
 dependencies = [
  "once_cell",
  "wasm-bindgen",
@@ -3055,7 +3055,7 @@ checksum = "6800badb6cb2082ffd7b6a67e6125bb39f18782f793520caee8cb8846be06112"
 [[package]]
 name = "libcosmic"
 version = "1.0.0"
-source = "git+https://github.com/pop-os/libcosmic.git?branch=iced-rebase#dba227086e020caba31be7814f5bab98e3ef01f0"
+source = "git+https://github.com/pop-os/libcosmic.git?branch=iced-rebase#86f05cd48a0c2eaed040a46647e250ec51c7f1bd"
 dependencies = [
  "apply",
  "ashpd 0.12.3",
@@ -3125,7 +3125,7 @@ checksum = "3d0b95e02c851351f877147b7deea7b1afb1df71b63aa5f8270716e0c5720616"
 dependencies = [
  "bitflags 2.11.0",
  "libc",
- "redox_syscall 0.7.2",
+ "redox_syscall 0.7.3",
 ]
 
 [[package]]
@@ -3555,9 +3555,9 @@ dependencies = [
 
 [[package]]
 name = "objc2"
-version = "0.6.3"
+version = "0.6.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "b7c2599ce0ec54857b29ce62166b0ed9b4f6f1a70ccc9a71165b6154caca8c05"
+checksum = "3a12a8ed07aefc768292f076dc3ac8c48f3781c8f2d5851dd3d98950e8c5a89f"
 dependencies = [
  "objc2-encode",
 ]
@@ -3586,7 +3586,7 @@ checksum = "d49e936b501e5c5bf01fda3a9452ff86dc3ea98ad5f283e1455153142d97518c"
 dependencies = [
  "bitflags 2.11.0",
  "block2 0.6.2",
- "objc2 0.6.3",
+ "objc2 0.6.4",
  "objc2-core-foundation",
  "objc2-foundation 0.3.2",
 ]
@@ -3612,7 +3612,7 @@ dependencies = [
  "bitflags 2.11.0",
  "block2 0.6.2",
  "dispatch2",
- "objc2 0.6.3",
+ "objc2 0.6.4",
 ]
 
 [[package]]
@@ -3675,7 +3675,7 @@ checksum = "e3e0adef53c21f888deb4fa59fc59f7eb17404926ee8a6f59f5df0fd7f9f3272"
 dependencies = [
  "bitflags 2.11.0",
  "block2 0.6.2",
- "objc2 0.6.3",
+ "objc2 0.6.4",
  "objc2-core-foundation",
 ]
 
@@ -3711,7 +3711,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "d87d638e33c06f577498cbcc50491496a3ed4246998a7fbba7ccb98b1e7eab22"
 dependencies = [
  "bitflags 2.11.0",
- "objc2 0.6.3",
+ "objc2 0.6.4",
  "objc2-core-foundation",
  "objc2-foundation 0.3.2",
 ]
@@ -3993,18 +3993,18 @@ checksum = "5be167a7af36ee22fe3115051bc51f6e6c7054c9348e28deb4f49bd6f705a315"
 
 [[package]]
 name = "pin-project"
-version = "1.1.10"
+version = "1.1.11"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "677f1add503faace112b9f1373e43e9e054bfdd22ff1a63c1bc485eaec6a6a8a"
+checksum = "f1749c7ed4bcaf4c3d0a3efc28538844fb29bcdd7d2b67b2be7e20ba861ff517"
 dependencies = [
  "pin-project-internal",
 ]
 
 [[package]]
 name = "pin-project-internal"
-version = "1.1.10"
+version = "1.1.11"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "6e918e4ff8c4549eb882f14b3a4bc8c8bc93de829416eacf579f1207a8fbf861"
+checksum = "d9b20ed30f105399776b9c883e68e536ef602a16ae6f596d2c473591d6ad64c6"
 dependencies = [
  "proc-macro2",
  "quote",
@@ -4013,9 +4013,9 @@ dependencies = [
 
 [[package]]
 name = "pin-project-lite"
-version = "0.2.16"
+version = "0.2.17"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "3b3cff922bd51709b605d9ead9aa71031d81447142d828eb4a6eba76fe619f9b"
+checksum = "a89322df9ebe1c1578d689c92318e070967d1042b512afbe49518723f4e6d5cd"
 
 [[package]]
 name = "pin-utils"
@@ -4025,9 +4025,9 @@ checksum = "8b870d8c151b6f2fb93e84a13146138f05d02ed11c7e7c54f8826aaaf7c9f184"
 
 [[package]]
 name = "piper"
-version = "0.2.4"
+version = "0.2.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "96c8c490f422ef9a4efd2cb5b42b76c8613d7e7dfc1caf667b8a3350a5acc066"
+checksum = "c835479a4443ded371d6c535cbfd8d31ad92c5d23ae9770a61bc155e4992a3c1"
 dependencies = [
  "atomic-waker",
  "fastrand",
@@ -4361,9 +4361,9 @@ dependencies = [
 
 [[package]]
 name = "range-alloc"
-version = "0.1.4"
+version = "0.1.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "c3d6831663a5098ea164f89cff59c6284e95f4e3c76ce9848d4529f5ccca9bde"
+checksum = "ca45419789ae5a7899559e9512e58ca889e41f04f1f2445e9f4b290ceccd1d08"
 
 [[package]]
 name = "rangemap"
@@ -4409,9 +4409,9 @@ dependencies = [
 
 [[package]]
 name = "redox_syscall"
-version = "0.7.2"
+version = "0.7.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "6d94dd2f7cd932d4dc02cc8b2b50dfd38bd079a4e5d79198b99743d7fcf9a4b4"
+checksum = "6ce70a74e890531977d37e532c34d45e9055d2409ed08ddba14529471ed0be16"
 dependencies = [
  "bitflags 2.11.0",
 ]
@@ -4516,7 +4516,7 @@ dependencies = [
  "dispatch2",
  "js-sys",
  "log",
- "objc2 0.6.3",
+ "objc2 0.6.4",
  "objc2-app-kit 0.3.2",
  "objc2-core-foundation",
  "objc2-foundation 0.3.2",
@@ -5914,9 +5914,9 @@ dependencies = [
 
 [[package]]
 name = "wasm-bindgen"
-version = "0.2.113"
+version = "0.2.114"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "60722a937f594b7fde9adb894d7c092fc1bb6612897c46368d18e7a20208eff2"
+checksum = "6532f9a5c1ece3798cb1c2cfdba640b9b3ba884f5db45973a6f442510a87d38e"
 dependencies = [
  "cfg-if",
  "once_cell",
@@ -5927,9 +5927,9 @@ dependencies = [
 
 [[package]]
 name = "wasm-bindgen-futures"
-version = "0.4.63"
+version = "0.4.64"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "8a89f4650b770e4521aa6573724e2aed4704372151bd0de9d16a3bbabb87441a"
+checksum = "e9c5522b3a28661442748e09d40924dfb9ca614b21c00d3fd135720e48b67db8"
 dependencies = [
  "cfg-if",
  "futures-util",
@@ -5941,9 +5941,9 @@ dependencies = [
 
 [[package]]
 name = "wasm-bindgen-macro"
-version = "0.2.113"
+version = "0.2.114"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "0fac8c6395094b6b91c4af293f4c79371c163f9a6f56184d2c9a85f5a95f3950"
+checksum = "18a2d50fcf105fb33bb15f00e7a77b772945a2ee45dcf454961fd843e74c18e6"
 dependencies = [
  "quote",
  "wasm-bindgen-macro-support",
@@ -5951,9 +5951,9 @@ dependencies = [
 
 [[package]]
 name = "wasm-bindgen-macro-support"
-version = "0.2.113"
+version = "0.2.114"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "ab3fabce6159dc20728033842636887e4877688ae94382766e00b180abac9d60"
+checksum = "03ce4caeaac547cdf713d280eda22a730824dd11e6b8c3ca9e42247b25c631e3"
 dependencies = [
  "bumpalo",
  "proc-macro2",
@@ -5964,9 +5964,9 @@ dependencies = [
 
 [[package]]
 name = "wasm-bindgen-shared"
-version = "0.2.113"
+version = "0.2.114"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "de0e091bdb824da87dc01d967388880d017a0a9bc4f3bdc0d86ee9f9336e3bb5"
+checksum = "75a326b8c223ee17883a4251907455a2431acc2791c98c26279376490c378c16"
 dependencies = [
  "unicode-ident",
 ]
@@ -6171,9 +6171,9 @@ dependencies = [
 
 [[package]]
 name = "web-sys"
-version = "0.3.90"
+version = "0.3.91"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "705eceb4ce901230f8625bd1d665128056ccbe4b7408faa625eec1ba80f59a97"
+checksum = "854ba17bb104abfb26ba36da9729addc7ce7f06f5c0f90f3c391f8461cca21f9"
 dependencies = [
  "js-sys",
  "wasm-bindgen",
@@ -6970,7 +6970,7 @@ dependencies = [
  "block2 0.6.2",
  "dispatch2",
  "dpi",
- "objc2 0.6.3",
+ "objc2 0.6.4",
  "objc2-app-kit 0.3.2",
  "objc2-core-foundation",
  "objc2-core-graphics",
@@ -6989,7 +6989,7 @@ version = "0.31.0-beta.2"
 source = "git+https://github.com/pop-os/winit.git?branch=iced-0.14-rebase#a610ac9c7a72b39ff102ed4d946291618dc725b6"
 dependencies = [
  "memmap2 0.9.10",
- "objc2 0.6.3",
+ "objc2 0.6.4",
  "objc2-core-foundation",
  "smol_str",
  "tracing",
@@ -7022,7 +7022,7 @@ dependencies = [
  "libredox",
  "orbclient",
  "raw-window-handle",
- "redox_syscall 0.7.2",
+ "redox_syscall 0.7.3",
  "smol_str",
  "tracing",
  "winit-core",
@@ -7037,7 +7037,7 @@ dependencies = [
  "block2 0.6.2",
  "dispatch2",
  "dpi",
- "objc2 0.6.3",
+ "objc2 0.6.4",
  "objc2-core-foundation",
  "objc2-foundation 0.3.2",
  "objc2-ui-kit",
@@ -7499,18 +7499,18 @@ checksum = "6df3dc4292935e51816d896edcd52aa30bc297907c26167fec31e2b0c6a32524"
 
 [[package]]
 name = "zerocopy"
-version = "0.8.39"
+version = "0.8.40"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "db6d35d663eadb6c932438e763b262fe1a70987f9ae936e60158176d710cae4a"
+checksum = "a789c6e490b576db9f7e6b6d661bcc9799f7c0ac8352f56ea20193b2681532e5"
 dependencies = [
  "zerocopy-derive",
 ]
 
 [[package]]
 name = "zerocopy-derive"
-version = "0.8.39"
+version = "0.8.40"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "4122cd3169e94605190e77839c9a40d40ed048d305bfdc146e7df40ab0f3e517"
+checksum = "f65c489a7071a749c849713807783f70672b28094011623e200cb86dcb835953"
 dependencies = [
  "proc-macro2",
  "quote",
