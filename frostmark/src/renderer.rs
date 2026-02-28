@@ -187,7 +187,9 @@ impl<'a, M: Clone + 'static, T: ValidTheme + 'a> MarkWidget<'a, M, T> {
                     widget::Column::new().into()
                 }
             }
-            "hr" => widget::rule::horizontal(1.0).into(),
+            "hr" => widget::column![widget::rule::horizontal(1)]
+                .padding(Padding::default().top(8).bottom(8))
+                .into(),
             "head" | "title" | "meta" | "rtc" | "rp" | "rb" => RenderedSpan::None,
 
             "input" => match get_attr(&attrs, "type").unwrap_or("text") {
