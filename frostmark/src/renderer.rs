@@ -205,17 +205,36 @@ impl<'a, M: Clone + 'static, T: ValidTheme + 'a> MarkWidget<'a, M, T> {
 
             "ul" => {
                 data.li_ordered_number = None;
-                self.render_children(node, data)
+                widget::column![self.render_children(node, data).render()]
+                    .padding(Padding::default().left(20))
+                    .into()
             }
             "ol" => {
                 let start = get_attr_num(&attrs, "start").unwrap_or(1.0) as usize;
-                self.render_children(node, data.ordered_from(start))
+                widget::column![
+                    self.render_children(node, data.ordered_from(start))
+                        .render()
+                ]
+                .padding(Padding::default().left(20))
+                .into()
             }
             "li" => {
+                let scaling = match data.heading_weight {
+                    1 => 1.8,
+                    2 => 1.5,
+                    3 => 1.25,
+                    4 => 1.15,
+                    5 => 0.875,
+                    6 => 0.75,
+                    7 => 0.625,
+                    _ => 1.0,
+                };
+                let size = self.text_size * (1.0 + ((scaling - 1.0) * self.heading_scale));
+
                 let bullet = if let Some(num) = data.li_ordered_number {
-                    widget::text!("{num}. ")
+                    widget::text!("{num}. ").size(size)
                 } else {
-                    widget::text("- ")
+                    widget::text("- ").size(size)
                 };
                 widget::row![bullet, self.render_children(node, data).render()].into()
             }
