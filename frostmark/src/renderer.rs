@@ -153,10 +153,10 @@ impl<'a, M: Clone + 'static, T: ValidTheme + 'a> MarkWidget<'a, M, T> {
 
             "blockquote" => widget::stack!(
                 widget::row![
-                    widget::space().width(10),
+                    widget::space().width(25),
                     self.render_children(node, data).render()
                 ],
-                widget::rule::vertical(2)
+                widget::rule::vertical(3)
             )
             .into(),
 
