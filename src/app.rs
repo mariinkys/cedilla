@@ -909,10 +909,11 @@ impl cosmic::Application for AppModel {
                     if let State::Ready {
                         markstate,
                         images_in_progress,
+                        path,
                         ..
                     } = &mut self.state
                     {
-                        return utils::images::download_images(markstate, images_in_progress);
+                        return utils::images::download_images(markstate, images_in_progress, path);
                     }
 
                     Task::none()
@@ -921,6 +922,7 @@ impl cosmic::Application for AppModel {
             },
             Message::Edit(action) => {
                 let State::Ready {
+                    path,
                     editor_content,
                     is_dirty,
                     markstate,
@@ -953,7 +955,7 @@ impl cosmic::Application for AppModel {
                     }
                 }
 
-                utils::images::download_images(markstate, images_in_progress)
+                utils::images::download_images(markstate, images_in_progress, path)
             }
             Message::FileSaved(result) => match result {
                 Ok(new_path) => {
@@ -1218,6 +1220,7 @@ impl cosmic::Application for AppModel {
             Message::ApplyFormatting(action) => self.apply_formatting_to_selection(action),
             Message::Undo => {
                 let State::Ready {
+                    path,
                     editor_content,
                     markstate,
                     images_in_progress,
@@ -1238,10 +1241,11 @@ impl cosmic::Application for AppModel {
                     *is_dirty = *history_index != 0;
                 }
 
-                utils::images::download_images(markstate, images_in_progress)
+                utils::images::download_images(markstate, images_in_progress, path)
             }
             Message::Redo => {
                 let State::Ready {
+                    path,
                     editor_content,
                     markstate,
                     images_in_progress,
@@ -1260,7 +1264,7 @@ impl cosmic::Application for AppModel {
                     *markstate = MarkState::with_html_and_markdown(&snapshot);
                 }
 
-                utils::images::download_images(markstate, images_in_progress)
+                utils::images::download_images(markstate, images_in_progress, path)
             }
 
             #[allow(clippy::collapsible_if)]
@@ -1542,6 +1546,7 @@ fn cedilla_main_view<'a>(
                         MarkWidget::new(markstate)
                             .on_updating_state(Message::UpdateMarkState)
                             .on_clicking_link(Message::LaunchUrl)
+                            .text_size(18.)
                             .code_highlight_theme(cosmic::iced::highlighter::Theme::InspiredGitHub)
                             .on_drawing_image(|info| {
                                 // TODO: SVGs

@@ -1,4 +1,4 @@
-use std::collections::HashSet;
+use std::{collections::HashSet, path::PathBuf};
 
 use cosmic::{Action, Task};
 use frostmark::MarkState;
@@ -13,9 +13,29 @@ pub struct Image {
     pub is_svg: bool,
 }
 
-async fn load_image(url: String) -> Result<Image, anywho::Error> {
+async fn load_image(url: String, base_path: Option<PathBuf>) -> Result<Image, anywho::Error> {
     use url::Url;
-    let parsed = Url::parse(url.as_ref()).map_err(|e| anywho::anywho!("{e}"))?;
+
+    let resolved_url = if url.starts_with("http://")
+        || url.starts_with("https://")
+        || url.starts_with("file://")
+    {
+        url.clone()
+    } else {
+        // Relative path — resolve against base_path
+        let base = base_path.ok_or_else(|| anywho::anywho!("No base path for relative URL"))?;
+        let base_dir = if base.is_dir() {
+            base
+        } else {
+            base.parent()
+                .map(PathBuf::from)
+                .ok_or_else(|| anywho::anywho!("No parent directory"))?
+        };
+        let resolved = base_dir.join(&url);
+        format!("file://{}", resolved.display())
+    };
+
+    let parsed = Url::parse(&resolved_url).map_err(|e| anywho::anywho!("{e}"))?;
 
     if parsed.scheme() == "file" {
         let path = parsed
@@ -54,10 +74,12 @@ async fn load_image(url: String) -> Result<Image, anywho::Error> {
 pub fn download_images(
     markstate: &mut MarkState,
     images_in_progress: &mut HashSet<String>,
+    base_path: &Option<PathBuf>,
 ) -> Task<Action<Message>> {
     Task::batch(markstate.find_image_links().into_iter().map(|url| {
         if images_in_progress.insert(url.clone()) {
-            Task::perform(load_image(url), Message::ImageDownloaded).map(cosmic::action::app)
+            Task::perform(load_image(url, base_path.clone()), Message::ImageDownloaded)
+                .map(cosmic::action::app)
         } else {
             Task::none()
         }
