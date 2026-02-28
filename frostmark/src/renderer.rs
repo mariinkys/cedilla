@@ -351,8 +351,10 @@ impl<'a, M: Clone + 'static, T: ValidTheme + 'a> MarkWidget<'a, M, T> {
         &mut self,
         node: &Node,
         attrs: &std::cell::Ref<'_, Vec<html5ever::Attribute>>,
-        data: ChildData,
+        mut data: ChildData,
     ) -> RenderedSpan<'a, M, T> {
+        data.alignment = None; // links are inline, don't propagate alignment inward
+
         let link_col = self
             .style
             .and_then(|n| n.link_color)
