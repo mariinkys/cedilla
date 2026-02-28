@@ -18,7 +18,7 @@ use cosmic::widget::space::horizontal;
 use cosmic::widget::{self, about::About, menu};
 use cosmic::widget::{
     ToastId, Toasts, button, container, image, nav_bar, pane_grid, responsive, scrollable,
-    segmented_button, text, toaster,
+    segmented_button, svg, text, toaster,
 };
 use cosmic::{prelude::*, surface, theme};
 use frostmark::{MarkState, MarkWidget, UpdateMsg};
@@ -83,6 +83,8 @@ enum State {
         markstate: MarkState,
         /// Images in the Markdown preview
         images: HashMap<String, image::Handle>,
+        /// SVGs in the Markdown preview
+        svgs: HashMap<String, svg::Handle>,
         /// Keep track of images in progress/downloading
         images_in_progress: HashSet<String>,
         /// Track if any changes have been made to the current file
@@ -520,6 +522,7 @@ impl cosmic::Application for AppModel {
                 editor_content,
                 markstate,
                 images,
+                svgs,
                 is_dirty,
                 panes,
                 preview_state,
@@ -530,6 +533,7 @@ impl cosmic::Application for AppModel {
                 editor_content,
                 markstate,
                 images,
+                svgs,
                 is_dirty,
                 panes,
                 preview_state,
@@ -738,6 +742,7 @@ impl cosmic::Application for AppModel {
                     editor_content: text_editor::Content::new(),
                     markstate: MarkState::with_html_and_markdown(""),
                     images: HashMap::new(),
+                    svgs: HashMap::new(),
                     images_in_progress: HashSet::new(),
                     is_dirty: true,
                     panes,
@@ -757,6 +762,7 @@ impl cosmic::Application for AppModel {
                     editor_content: text_editor::Content::new(),
                     markstate: MarkState::with_html_and_markdown(""),
                     images: HashMap::new(),
+                    svgs: HashMap::new(),
                     images_in_progress: HashSet::new(),
                     is_dirty: true,
                     panes,
@@ -803,6 +809,7 @@ impl cosmic::Application for AppModel {
                     editor_content: text_editor::Content::new(),
                     markstate: MarkState::with_html_and_markdown(""),
                     images: HashMap::new(),
+                    svgs: HashMap::new(),
                     images_in_progress: HashSet::new(),
                     is_dirty: true,
                     panes,
@@ -898,6 +905,7 @@ impl cosmic::Application for AppModel {
                         editor_content: text_editor::Content::with_text(content.as_ref()),
                         markstate,
                         images: HashMap::new(),
+                        svgs: HashMap::new(),
                         images_in_progress,
                         is_dirty: false,
                         panes,
@@ -1172,16 +1180,17 @@ impl cosmic::Application for AppModel {
                 Task::none()
             }
             Message::ImageDownloaded(res) => {
-                let State::Ready { images, .. } = &mut self.state else {
+                let State::Ready { images, svgs, .. } = &mut self.state else {
                     return Task::none();
                 };
 
                 match res {
                     Ok(image) => {
-                        // Note: Ignoring `image.is_svg` for now.
-                        // See the `large_readme.rs` example for how
-                        // to handle SVG images.
-                        images.insert(image.url, image::Handle::from_bytes(image.bytes));
+                        if image.is_svg {
+                            svgs.insert(image.url, svg::Handle::from_memory(image.bytes));
+                        } else {
+                            images.insert(image.url, image::Handle::from_bytes(image.bytes));
+                        }
                     }
                     Err(err) => {
                         eprintln!("Couldn't download image: {err}");
@@ -1472,6 +1481,7 @@ fn cedilla_main_view<'a>(
     editor_content: &'a text_editor::Content,
     markstate: &'a MarkState,
     images: &'a HashMap<String, image::Handle>,
+    svgs: &'a HashMap<String, svg::Handle>,
     is_dirty: &'a bool,
     panes: &'a pane_grid::State<PaneContent>,
     preview_state: &'a PreviewState,
@@ -1559,6 +1569,15 @@ fn cedilla_main_view<'a>(
                                         img = img.height(h);
                                     }
                                     img.into()
+                                } else if let Some(svg_f) = svgs.get(info.url).cloned() {
+                                    let mut svg = widget::svg(svg_f);
+                                    if let Some(w) = info.width {
+                                        svg = svg.width(w);
+                                    }
+                                    if let Some(h) = info.height {
+                                        svg = svg.height(h);
+                                    }
+                                    svg.into()
                                 } else {
                                     "...".into()
                                 }
