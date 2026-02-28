@@ -366,7 +366,6 @@ impl<'a, M: Clone + 'static, T: ValidTheme + 'a> MarkWidget<'a, M, T> {
         {
             let url = attr.value.to_string();
             let children_empty = { node.children.borrow().is_empty() };
-
             let msg = self.fn_clicking_link.as_ref();
 
             if children_empty {
@@ -380,13 +379,13 @@ impl<'a, M: Clone + 'static, T: ValidTheme + 'a> MarkWidget<'a, M, T> {
                         .collect(),
                 )
             } else {
-                link(
-                    children.render(),
-                    &url,
-                    msg,
-                    self.fn_style_link_button.clone(),
-                )
-                .into()
+                let children_rendered = children.render();
+                if let Some(on_click) = msg {
+                    let msg = on_click(url.clone());
+                    widget::mouse_area(children_rendered).on_press(msg).into()
+                } else {
+                    children_rendered.into()
+                }
             }
         } else if let RenderedSpan::Spans(n) = children {
             RenderedSpan::Spans(
@@ -395,13 +394,7 @@ impl<'a, M: Clone + 'static, T: ValidTheme + 'a> MarkWidget<'a, M, T> {
                     .collect(),
             )
         } else {
-            link(
-                children.render(),
-                "",
-                Some(&Self::e).filter(|_| false),
-                self.fn_style_link_button.clone(),
-            )
-            .into()
+            children.render().into()
         }
     }
 
@@ -458,7 +451,17 @@ impl<'a, M: Clone + 'static, T: ValidTheme + 'a> MarkWidget<'a, M, T> {
         }
 
         if !row.is_empty() {
-            column.push(row);
+            if let Some(align) = data.alignment {
+                let align: cosmic::iced::Alignment = align.into();
+                column.push(
+                    widget::column![row.render()]
+                        .width(Length::Fill)
+                        .align_x(align)
+                        .into(),
+                );
+            } else {
+                column.push(row);
+            }
         }
 
         let len = column.len();
