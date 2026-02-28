@@ -12,7 +12,7 @@ use crate::{
         ChildAlignment, ChildDataFlags, ImageInfo, MarkWidget, RenderedSpan, UpdateMsg,
         UpdateMsgKind,
     },
-    widgets::{link, link_text, underline},
+    widgets::{link_text, underline},
 };
 
 use super::structs::ChildData;
@@ -398,10 +398,10 @@ impl<'a, M: Clone + 'static, T: ValidTheme + 'a> MarkWidget<'a, M, T> {
         }
     }
 
-    fn e(_: String) -> M {
-        // This will never run, don't worry
-        panic!()
-    }
+    // fn e(_: String) -> M {
+    //     // This will never run, don't worry
+    //     panic!()
+    // }
 
     fn render_children(&mut self, node: &Node, data: ChildData) -> RenderedSpan<'a, M, T> {
         let children = node.children.borrow();
