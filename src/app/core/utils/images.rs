@@ -52,15 +52,23 @@ async fn load_image(url: String, base_path: Option<PathBuf>) -> Result<Image, an
 
         Ok(Image { bytes, url, is_svg })
     } else if parsed.scheme() == "http" || parsed.scheme() == "https" {
-        let bytes = reqwest::get(url.clone())
+        let response = reqwest::get(url.clone())
             .await
-            .map_err(|e| anywho::anywho!("{e}"))?
+            .map_err(|e| anywho::anywho!("{e}"))?;
+
+        let is_svg = response
+            .headers()
+            .get("content-type")
+            .and_then(|v| v.to_str().ok())
+            .map(|ct| ct.contains("svg"))
+            .unwrap_or(false)
+            || url.trim_end().to_lowercase().ends_with(".svg");
+
+        let bytes = response
             .bytes()
             .await
             .map_err(|e| anywho::anywho!("{e}"))?
             .to_vec();
-
-        let is_svg = url.trim_end().to_lowercase().ends_with(".svg");
 
         Ok(Image { bytes, url, is_svg })
     } else {
