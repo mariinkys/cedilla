@@ -12,13 +12,13 @@ use crate::{fl, icons};
 use cosmic::app::context_drawer;
 use cosmic::iced::{Alignment, Event, Length, Padding, Subscription, highlighter, window};
 use cosmic::iced_core::keyboard::{Key, Modifiers};
-use cosmic::iced_widget::{center, column, row, tooltip};
+use cosmic::iced_widget::{center, column, row, scrollable, tooltip};
 use cosmic::widget::menu::Action;
 use cosmic::widget::space::horizontal;
 use cosmic::widget::{self, about::About, menu};
 use cosmic::widget::{
-    ToastId, Toasts, button, container, image, nav_bar, pane_grid, responsive, scrollable,
-    segmented_button, svg, text, toaster,
+    ToastId, Toasts, button, container, image, nav_bar, pane_grid, responsive, segmented_button,
+    svg, text, toaster,
 };
 use cosmic::{prelude::*, surface, theme};
 use frostmark::{MarkState, MarkWidget, UpdateMsg};
@@ -180,6 +180,8 @@ pub enum Message {
     PaneResized(pane_grid::ResizeEvent),
     /// Pane grid dragged callback
     PaneDragged(pane_grid::DragEvent),
+    /// Scrollable position changed
+    ScrollChanged(widget::Id, scrollable::Viewport),
     /// Apply formatting to selected text
     ApplyFormatting(utils::SelectionAction),
     /// Undo requested
@@ -1225,6 +1227,25 @@ impl cosmic::Application for AppModel {
                 Task::none()
             }
             Message::PaneDragged(_) => Task::none(),
+            Message::ScrollChanged(source_id, viewport) => {
+                let State::Ready { .. } = &mut self.state else {
+                    return Task::none();
+                };
+
+                if self.config.scrollbar_sync != BoolState::Yes {
+                    return Task::none();
+                }
+
+                let offset = viewport.absolute_offset();
+
+                let target_id = if source_id == editor_scrollable_id() {
+                    preview_scrollable_id()
+                } else {
+                    editor_scrollable_id()
+                };
+
+                scrollable::scroll_to(target_id, offset.into()).map(cosmic::action::app)
+            }
 
             Message::ApplyFormatting(action) => self.apply_formatting_to_selection(action),
             Message::Undo => {
@@ -1336,6 +1357,18 @@ impl cosmic::Application for AppModel {
                     }
                     Task::none()
                 }
+                ConfigInput::ScrollbarSync(state) => {
+                    if let Some(handler) = &self.config_handler {
+                        if let Err(err) = self.config.set_scrollbar_sync(handler, state) {
+                            eprintln!("{err}");
+                            // even if it fails we update the config (it won't get saved after restart)
+                            let mut old_config = self.config.clone();
+                            old_config.scrollbar_sync = state;
+                            self.config = old_config;
+                        }
+                    }
+                    Task::none()
+                }
             },
             Message::AppCloseRequested => {
                 let State::Ready {
@@ -1438,6 +1471,19 @@ impl AppModel {
                         },
                     )),
                 )
+                .add(
+                    widget::settings::item::builder(fl!("scrollbar-sync")).control(
+                        widget::dropdown(
+                            BoolState::all_labels(),
+                            Some(self.config.scrollbar_sync.to_index()),
+                            |index| {
+                                Message::ConfigInput(ConfigInput::ScrollbarSync(
+                                    BoolState::from_index(index),
+                                ))
+                            },
+                        ),
+                    ),
+                )
                 .into(),
             widget::settings::section()
                 .title(fl!("view"))
@@ -1508,6 +1554,8 @@ fn cedilla_main_view<'a>(
                         .retain_focus_on_external_click(true)
                         .on_action(Message::Edit),
                 )
+                .id(editor_scrollable_id())
+                .on_scroll(|vp| Message::ScrollChanged(editor_scrollable_id(), vp))
                 .height(Length::Fixed(size.height - 5.)), // This is a bit of a workaround but it works,
                 widget::Id::new("text_editor_widget"),
             )
@@ -1583,6 +1631,8 @@ fn cedilla_main_view<'a>(
                                 }
                             }),
                     )
+                    .id(preview_scrollable_id())
+                    .on_scroll(|vp| Message::ScrollChanged(preview_scrollable_id(), vp))
                     .width(Length::Fill),
                 )
                 .padding(spacing.space_xxs)
@@ -1691,4 +1741,12 @@ fn cedilla_main_view<'a>(
         .width(Length::Fill)
         .height(Length::Fill)
         .into()
+}
+
+fn editor_scrollable_id() -> widget::Id {
+    widget::Id::new("editor_scroll")
+}
+
+fn preview_scrollable_id() -> widget::Id {
+    widget::Id::new("preview_scroll")
 }

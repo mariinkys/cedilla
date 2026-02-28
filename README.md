@@ -33,7 +33,7 @@ This is a WIP project that may or may not be released eventually.
 - [X] Ctrl-Z
 - [X] Helper headerbar with options to format text 
 - [X] Remember view state on close (navabar and preview toggle), also allow to resume from last open file on app open 
-- [ ] Optional scrollbar sync
+- [X] Optional scrollbar sync
 - [X] Support html 
 - [ ] PDF Exporting
 

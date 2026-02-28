@@ -35,6 +35,7 @@ hide = Hide
 last-file = Open the last file when the app starts
 yes = Yes
 no = No
+scrollbar-sync = Sync Preview and Editor scrollbars
 
 <#-- Application MenuBar -->
 file = File

@@ -23,6 +23,7 @@ pub struct CedillaConfig {
     pub last_preview_showstate: ShowState,
     pub open_last_file: BoolState,
     pub last_open_file: Option<PathBuf>,
+    pub scrollbar_sync: BoolState,
 }
 
 impl Default for CedillaConfig {
@@ -42,6 +43,7 @@ impl Default for CedillaConfig {
             last_preview_showstate: ShowState::default(),
             open_last_file: BoolState::default(),
             last_open_file: None,
+            scrollbar_sync: BoolState::default(),
         }
     }
 }
@@ -169,4 +171,6 @@ pub enum ConfigInput {
     StatusBarShowState(ShowState),
     /// Update if the user wants to open last opened file or not
     OpenLastFile(BoolState),
+    /// Update if the user wants the editor and preview scrollbars to be in sync
+    ScrollbarSync(BoolState),
 }
