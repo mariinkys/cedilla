@@ -5,5 +5,6 @@ pub mod images;
 pub mod markdown;
 mod toast;
 
+pub use images::Image;
 pub use markdown::SelectionAction;
 pub use toast::CedillaToast;

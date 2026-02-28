@@ -34,7 +34,7 @@ This is a WIP project that may or may not be released eventually.
 - [X] Helper headerbar with options to format text 
 - [X] Remember view state on close (navabar and preview toggle), also allow to resume from last open file on app open 
 - [ ] Optional scrollbar sync
-- [ ] Support html 
+- [X] Support html 
 - [ ] PDF Exporting
 
 
@@ -56,6 +56,8 @@ sudo just install
 ## Attribution
 
 > "[Pop Icons](http://github.com/pop-os/icon-theme)" by [System76](http://system76.com/) is licensed under [CC-SA-4.0](http://creativecommons.org/licenses/by-sa/4.0/)
+
+> For Markdown and HTML rendering this app uses the amazing work of [Mrmayman](https://github.com/Mrmayman) with [Frostmark](https://github.com/Mrmayman/frostmark). (Adapted to work with libcosmic by me)
 
 ## Copyright and Licensing
 
