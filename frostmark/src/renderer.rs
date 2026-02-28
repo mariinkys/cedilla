@@ -596,6 +596,7 @@ fn is_block_element(node: &Node) -> bool {
             | "video"
             | "br"
             | "details"
+            | "img" // treat image as a block so that it get's correctly centered...
             | "summary" // not really block but acts like it
     )
 }
