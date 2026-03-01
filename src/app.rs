@@ -24,6 +24,7 @@ use frostmark::{MarkState, MarkWidget, UpdateMsg};
 use slotmap::Key as SlotMapKey;
 use std::collections::{HashMap, HashSet, VecDeque};
 use std::path::{Path, PathBuf};
+use std::process;
 use std::sync::Arc;
 use widgets::{TextEditor, text_editor};
 
@@ -113,6 +114,13 @@ pub enum PreviewState {
     Shown,
 }
 
+/// Possible actions after asking to discard changes in the warning [`DialogPage`]
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum DiscardChangesAction {
+    CloseApp,
+    OpenFile(PathBuf),
+}
+
 /// Messages emitted by the application and its widgets.
 #[derive(Debug, Clone)]
 pub enum Message {
@@ -158,6 +166,8 @@ pub enum Message {
     Edit(text_editor::Action),
     /// Callback after saving the current file
     FileSaved(Result<PathBuf, anywho::Error>),
+    /// Callback after asking to close a file discarding changes
+    DiscardChanges(DiscardChangesAction),
     /// Deletes the given node entity of the navbar folder or file
     DeleteNode(cosmic::widget::segmented_button::Entity),
     /// Renames the given node entity of the navbar folder or file
@@ -191,7 +201,7 @@ pub enum Message {
     /// Callback after input on the Config [`ContextPage`]
     ConfigInput(ConfigInput),
     /// Callback after using asks to close the app
-    AppCloseRequested,
+    AppCloseRequested(window::Id),
 }
 
 #[derive(Copy, Clone, Debug, Eq, PartialEq)]
@@ -447,6 +457,18 @@ impl cosmic::Application for AppModel {
     }
 
     fn on_nav_select(&mut self, id: nav_bar::Id) -> Task<cosmic::Action<Message>> {
+        let State::Ready {
+            editor_content,
+            is_dirty,
+            history_index,
+            path,
+            ..
+        } = &self.state
+        else {
+            return Task::none();
+        };
+        let old_path = path;
+
         let node_opt = match self.nav_model.data_mut::<ProjectNode>(id) {
             Some(node) => {
                 if let ProjectNode::Folder { open, .. } = node {
@@ -483,12 +505,30 @@ impl cosmic::Application for AppModel {
                         Task::none()
                     }
                     ProjectNode::File { path, .. } => {
-                        // store parent directory of selected file
-                        self.selected_nav_path = path.parent().map(|p| p.to_path_buf());
+                        // we don't do this here anymore because if the user discard changes... we don't want to change the selected_nav_path
+                        // it's better to do this after opening a file if the path opened is inside the vault
+                        //store parent directory of selected file
+                        //self.selected_nav_path = path.parent().map(|p| p.to_path_buf());
 
-                        Task::perform(utils::files::load_file(path), |res| {
-                            cosmic::action::app(Message::OpenFile(res))
-                        })
+                        if *is_dirty {
+                            if (old_path.is_some() && *history_index != 0)
+                                || (old_path.is_none() && !editor_content.text().trim().is_empty())
+                            {
+                                Task::done(cosmic::action::app(Message::DialogAction(
+                                    dialogs::DialogAction::OpenConfirmCloseFileDialog(
+                                        DiscardChangesAction::OpenFile(path),
+                                    ),
+                                )))
+                            } else {
+                                Task::perform(utils::files::load_file(path), |res| {
+                                    cosmic::action::app(Message::OpenFile(res))
+                                })
+                            }
+                        } else {
+                            Task::perform(utils::files::load_file(path), |res| {
+                                cosmic::action::app(Message::OpenFile(res))
+                            })
+                        }
                     }
                 }
             }
@@ -555,8 +595,6 @@ impl cosmic::Application for AppModel {
         let subscriptions = vec![
             // Watch for key_bind inputs
             cosmic::iced::event::listen_with(|event, status, _| match event {
-                Event::Window(window::Event::Closed) => Some(Message::AppCloseRequested),
-                Event::Window(window::Event::CloseRequested) => Some(Message::AppCloseRequested),
                 Event::Keyboard(cosmic::iced::keyboard::Event::KeyPressed {
                     key,
                     modifiers,
@@ -583,6 +621,10 @@ impl cosmic::Application for AppModel {
         ];
 
         Subscription::batch(subscriptions)
+    }
+
+    fn on_close_requested(&self, id: window::Id) -> Option<Message> {
+        Some(Message::AppCloseRequested(id))
     }
 
     /// Handles messages emitted by the application and its widgets.
@@ -725,7 +767,9 @@ impl cosmic::Application for AppModel {
                     crate::config::BoolState::No => None,
                 };
 
-                if let Some(p) = path {
+                if let Some(p) = path
+                    && p.exists()
+                {
                     // store parent directory of selected file
                     self.selected_nav_path = p.parent().map(|p| p.to_path_buf());
 
@@ -894,6 +938,12 @@ impl cosmic::Application for AppModel {
             }
             Message::OpenFile(result) => match result {
                 Ok((path, content)) => {
+                    // store parent directory of selected file in nav_path only if path is inside vault
+                    let vault_path = PathBuf::from(&self.config.vault_path);
+                    if path.starts_with(&vault_path) {
+                        self.selected_nav_path = path.parent().map(|p| p.to_path_buf());
+                    }
+
                     // Create initial pane configuration (TODO: Move this to a helper func (also used in NewFile))
                     let (mut panes, first_pane) = pane_grid::State::new(PaneContent::Editor);
                     panes.split(pane_grid::Axis::Vertical, first_pane, PaneContent::Preview);
@@ -978,6 +1028,16 @@ impl cosmic::Application for AppModel {
                     self.update(Message::AddToast(CedillaToast::new("File Saved!")))
                 }
                 Err(e) => self.update(Message::AddToast(CedillaToast::new(e))),
+            },
+            Message::DiscardChanges(action) => match action {
+                DiscardChangesAction::CloseApp => {
+                    process::exit(0);
+                }
+                DiscardChangesAction::OpenFile(path) => {
+                    Task::perform(utils::files::load_file(path), |res| {
+                        cosmic::action::app(Message::OpenFile(res))
+                    })
+                }
             },
             Message::DeleteNode(entity) => {
                 let Some(node) = self.nav_model.data::<ProjectNode>(entity).cloned() else {
@@ -1369,8 +1429,11 @@ impl cosmic::Application for AppModel {
                     Task::none()
                 }
             },
-            Message::AppCloseRequested => {
+            Message::AppCloseRequested(window_id) => {
                 let State::Ready {
+                    editor_content,
+                    is_dirty,
+                    history_index,
                     preview_state,
                     path,
                     ..
@@ -1378,6 +1441,10 @@ impl cosmic::Application for AppModel {
                 else {
                     return Task::none();
                 };
+
+                if Some(window_id) != self.core.main_window_id() {
+                    return Task::none();
+                }
 
                 if let Some(handler) = &self.config_handler {
                     let current_preview_state = match preview_state {
@@ -1409,7 +1476,23 @@ impl cosmic::Application for AppModel {
                     }
                 }
 
-                cosmic::iced::window::close(window::Id::RESERVED)
+                if *is_dirty {
+                    if (path.is_some() && *history_index != 0)
+                        || (path.is_none() && !editor_content.text().trim().is_empty())
+                    {
+                        println!("TODO: We're here but for some reason it doesn't work");
+                        //self.update(Message::DialogAction(
+                        //    dialogs::DialogAction::OpenConfirmCloseFileDialog(
+                        //        DiscardChangesAction::CloseApp,
+                        //    ),
+                        //))
+                        process::exit(0);
+                    } else {
+                        process::exit(0);
+                    }
+                } else {
+                    process::exit(0);
+                }
             }
         }
     }
