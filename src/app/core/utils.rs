@@ -3,6 +3,7 @@
 pub mod files;
 pub mod images;
 pub mod markdown;
+pub mod pdf;
 mod toast;
 
 pub use images::Image;

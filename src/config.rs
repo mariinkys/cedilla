@@ -24,6 +24,7 @@ pub struct CedillaConfig {
     pub open_last_file: BoolState,
     pub last_open_file: Option<PathBuf>,
     pub scrollbar_sync: BoolState,
+    pub gotenberg_url: String,
 }
 
 impl Default for CedillaConfig {
@@ -44,6 +45,7 @@ impl Default for CedillaConfig {
             open_last_file: BoolState::default(),
             last_open_file: None,
             scrollbar_sync: BoolState::default(),
+            gotenberg_url: String::new(),
         }
     }
 }
@@ -63,6 +65,11 @@ impl CedillaConfig {
             }
             None => CedillaConfig::default(),
         }
+    }
+
+    /// Returns true if the Gotenberg URL is not empty
+    pub fn is_gotenberg_configured(&self) -> bool {
+        !self.gotenberg_url.trim().is_empty()
     }
 }
 
@@ -173,4 +180,8 @@ pub enum ConfigInput {
     OpenLastFile(BoolState),
     /// Update if the user wants the editor and preview scrollbars to be in sync
     ScrollbarSync(BoolState),
+    /// Update the current gotenberg client url
+    GotenbergUrlInput(String),
+    /// Save the new gotenberg url
+    GotenbergUrlSave,
 }

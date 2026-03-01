@@ -39,6 +39,10 @@ last-file = Open the last file when the app starts
 yes = Yes
 no = No
 scrollbar-sync = Sync Preview and Editor scrollbars
+pdf-exporting = PDF Exporting
+gotenberg-url = Set the Gotenberg server URL
+apply = Apply
+more-info = More Info
 
 <#-- Application MenuBar -->
 file = File

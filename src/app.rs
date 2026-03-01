@@ -17,7 +17,7 @@ use cosmic::widget::space::horizontal;
 use cosmic::widget::{self, about::About, menu};
 use cosmic::widget::{
     ToastId, Toasts, button, container, image, nav_bar, pane_grid, responsive, segmented_button,
-    svg, text, toaster,
+    svg, text, text_input, toaster,
 };
 use cosmic::{prelude::*, surface, theme};
 use frostmark::{MarkState, MarkWidget, UpdateMsg};
@@ -66,6 +66,8 @@ pub struct AppModel {
     app_themes: Vec<String>,
     /// Currently selected path on the navbar (i need these for accurate file creadtion deletion...)
     selected_nav_path: Option<PathBuf>,
+    /// Gotenberg client, needed for Pdf exporting
+    gotenberg_client: gotenberg_pdf::Client,
     /// Application State
     state: State,
 }
@@ -197,6 +199,8 @@ pub enum Message {
     Undo,
     /// Redo requested
     Redo,
+    /// Export current document to PDF
+    ExportPDF,
 
     /// Callback after input on the Config [`ContextPage`]
     ConfigInput(ConfigInput),
@@ -257,6 +261,8 @@ impl cosmic::Application for AppModel {
             .developers([("mariinkys", "kysdev.owjga@aleeas.com")])
             .comments("\"Pop Icons\" by System76 is licensed under CC-SA-4.0");
 
+        let gotenberg_url = flags.config.gotenberg_url.clone();
+
         // Construct the app model with the runtime's core.
         let mut app = AppModel {
             toasts: Toasts::new(Message::CloseToast),
@@ -273,6 +279,7 @@ impl cosmic::Application for AppModel {
             config: flags.config,
             app_themes: vec![fl!("match-desktop"), fl!("dark"), fl!("light")],
             selected_nav_path: None,
+            gotenberg_client: gotenberg_pdf::Client::new(&gotenberg_url),
             state: State::Loading,
         };
 
@@ -1356,6 +1363,48 @@ impl cosmic::Application for AppModel {
 
                 utils::images::download_images(markstate, images_in_progress, path)
             }
+            Message::ExportPDF => {
+                let State::Ready {
+                    editor_content,
+                    path,
+                    ..
+                } = &mut self.state
+                else {
+                    return Task::none();
+                };
+
+                let content = editor_content.text();
+
+                if self.config.is_gotenberg_configured() && !content.trim().is_empty() {
+                    let client = self.gotenberg_client.clone();
+                    let file_path = path.clone();
+
+                    Task::perform(
+                        async move {
+                            match utils::files::open_pdf_file_saver().await {
+                                Some(path) => Some(
+                                    utils::pdf::export_pdf(client, file_path, content, path).await,
+                                ),
+                                // Error selecting where to save the file
+                                None => None,
+                            }
+                        },
+                        |res| match res {
+                            Some(result) => match result {
+                                Ok(_) => cosmic::action::app(Message::AddToast(CedillaToast::new(
+                                    "Exported Correctly",
+                                ))),
+                                Err(e) => {
+                                    cosmic::action::app(Message::AddToast(CedillaToast::new(e)))
+                                }
+                            },
+                            None => cosmic::action::none(),
+                        },
+                    )
+                } else {
+                    Task::none()
+                }
+            }
 
             #[allow(clippy::collapsible_if)]
             Message::ConfigInput(input) => match input {
@@ -1427,6 +1476,20 @@ impl cosmic::Application for AppModel {
                             self.config = old_config;
                         }
                     }
+                    Task::none()
+                }
+                ConfigInput::GotenbergUrlInput(state) => {
+                    if let Some(handler) = &self.config_handler {
+                        if let Err(err) = self.config.set_gotenberg_url(handler, state) {
+                            eprintln!("{err}");
+                        }
+                    }
+                    Task::none()
+                }
+                ConfigInput::GotenbergUrlSave => {
+                    // rebuild the gotenberg client
+                    self.gotenberg_client = gotenberg_pdf::Client::new(&self.config.gotenberg_url);
+
                     Task::none()
                 }
             },
@@ -1566,6 +1629,28 @@ impl AppModel {
                             },
                         ),
                     ),
+                )
+                .add(
+                    cosmic::widget::column::with_children(vec![
+                        column![
+                            text::body(fl!("pdf-exporting")),
+                            text::caption(fl!("gotenberg-url"))
+                        ]
+                        .into(),
+                        text_input(fl!("gotenberg-url"), &self.config.gotenberg_url)
+                            .on_input(|v| Message::ConfigInput(ConfigInput::GotenbergUrlInput(v)))
+                            .into(),
+                        row![
+                            button::text(fl!("more-info")).on_press(Message::LaunchUrl(
+                                String::from("https://gotenberg.dev/")
+                            )),
+                            horizontal(),
+                            button::suggested(fl!("apply"))
+                                .on_press(Message::ConfigInput(ConfigInput::GotenbergUrlSave))
+                        ]
+                        .into(),
+                    ])
+                    .spacing(cosmic::theme::spacing().space_xxs),
                 )
                 .into(),
             widget::settings::section()
@@ -1794,6 +1879,12 @@ fn cedilla_main_view<'a>(
                     .on_press(Message::ApplyFormatting(utils::SelectionAction::Heading1)),
                 button::icon(icons::get_handle("helperbar/rule-symbolic", 18))
                     .on_press(Message::ApplyFormatting(utils::SelectionAction::Rule)),
+                horizontal(),
+                button::icon(icons::get_handle("helperbar/pdf-symbolic", 18)).on_press_maybe(
+                    app_config
+                        .is_gotenberg_configured()
+                        .then_some(Message::ExportPDF)
+                )
             ]
             .padding(spacing.space_xxs)
             .spacing(spacing.space_xxs),
