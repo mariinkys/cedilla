@@ -3,8 +3,9 @@
 use std::sync::Arc;
 
 use cosmic::Task;
+use widgets::text_editor;
 
-use crate::app::{AppModel, Message, State, widgets::text_editor};
+use crate::app::{AppModel, Message, State};
 
 /// Actions that can be performed on the current text selection
 #[derive(Debug, Clone)]

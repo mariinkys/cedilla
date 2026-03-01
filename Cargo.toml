@@ -28,9 +28,10 @@ percent-encoding.workspace = true
 reqwest.workspace = true
 url.workspace = true
 frostmark = { path = "frostmark" }
+widgets = { path = "widgets" }
 
 [workspace]
-members = [".","frostmark"]
+members = [".","frostmark", "widgets"]
 
 [workspace.dependencies]
 futures-util = "0.3.32"

@@ -767,6 +767,7 @@ dependencies = [
  "slotmap",
  "tokio",
  "url",
+ "widgets",
 ]
 
 [[package]]
@@ -6365,6 +6366,13 @@ dependencies = [
  "log",
  "thiserror 2.0.18",
  "web-sys",
+]
+
+[[package]]
+name = "widgets"
+version = "0.1.0"
+dependencies = [
+ "libcosmic",
 ]
 
 [[package]]

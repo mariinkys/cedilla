@@ -5,7 +5,6 @@ use crate::app::context_page::ContextPage;
 use crate::app::core::project::ProjectNode;
 use crate::app::core::utils::{self, CedillaToast, Image};
 use crate::app::dialogs::{DialogPage, DialogState};
-use crate::app::widgets::{TextEditor, text_editor};
 use crate::config::{AppTheme, BoolState, CedillaConfig, ConfigInput, ShowState};
 use crate::key_binds::key_binds;
 use crate::{fl, icons};
@@ -26,12 +25,12 @@ use slotmap::Key as SlotMapKey;
 use std::collections::{HashMap, HashSet, VecDeque};
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
+use widgets::{TextEditor, text_editor};
 
 pub mod app_menu;
 mod context_page;
 mod core;
 mod dialogs;
-mod widgets;
 
 const REPOSITORY: &str = env!("CARGO_PKG_REPOSITORY");
 
