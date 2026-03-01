@@ -381,6 +381,7 @@ impl cosmic::Application for AppModel {
 
         if !self.core().is_condensed() {
             nav = nav.max_width(280);
+            nav = nav.width(Length::Fixed(280.)); // remove if it ever get's fixed (needed right now in iced-rebase branch)
         }
 
         Some(
