@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: GPL-3.0
+
 use std::{collections::HashSet, path::PathBuf};
 
 use cosmic::{Action, Task};

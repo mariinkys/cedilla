@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: GPL-3.0
+
 #![allow(dead_code)]
 #![allow(clippy::type_complexity)]
 // This is an adapted version of the official iced markdown widget: https://github.com/iced-rs/iced/blob/master/widget/src/text_editor.rs

@@ -1,7 +1,6 @@
 //
 // Original code by: Mrmayman <navneetkrishna22@gmail.com>
 // https://github.com/Mrmayman/frostmark
-// I've only adapted it to work with libcosmic
 //
 
 /// The style of a [`crate::MarkWidget`]

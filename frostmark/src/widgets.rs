@@ -1,27 +1,9 @@
 //
 // Original code by: Mrmayman <navneetkrishna22@gmail.com>
 // https://github.com/Mrmayman/frostmark
-// I've only adapted it to work with libcosmic
 //
 
 use cosmic::iced::{Element, Font, Length, advanced, widget};
-
-//use crate::structs::FStyleLinkButton;
-
-// pub fn link<'a, M: 'a, T, R: advanced::Renderer + 'a, F>(
-//     e: impl Into<Element<'a, M, T, R>>,
-//     url: &str,
-//     msg: Option<&F>,
-//     _f: Option<FStyleLinkButton<T>>,
-// ) -> widget::Button<'a, M, T, R>
-// where
-//     T: widget::button::Catalog + widget::rule::Catalog + 'a,
-//     F: Fn(String) -> M,
-// {
-//     widget::button(underline(e))
-//         .on_press_maybe(msg.map(|n| n(url.to_owned())))
-//         .padding(0)
-// }
 
 pub fn link_text<'a, M: 'a, F>(
     e: widget::text::Span<'a, M, Font>,

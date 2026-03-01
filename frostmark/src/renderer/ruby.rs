@@ -1,3 +1,8 @@
+//
+// Original code by: Mrmayman <navneetkrishna22@gmail.com>
+// https://github.com/Mrmayman/frostmark
+//
+
 use cosmic::iced::widget;
 use markup5ever_rcdom::{Node, NodeData};
 

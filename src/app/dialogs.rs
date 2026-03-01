@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: GPL-3.0
+
 use std::{collections::VecDeque, path::PathBuf};
 
 use cosmic::{Element, Task, iced::Alignment, theme, widget};

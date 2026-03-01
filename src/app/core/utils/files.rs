@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: GPL-3.0
+
 use anywho::anywho;
 use cosmic::dialog::{ashpd::desktop::file_chooser::SelectedFiles, file_chooser::FileFilter};
 use std::{path::PathBuf, sync::Arc};
