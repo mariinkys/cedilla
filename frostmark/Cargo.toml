@@ -12,6 +12,7 @@ markup5ever_rcdom = "0.38.0"
 bitflags = "2.11.0"
 
 comrak = { version = "0.50", default-features = false, optional = true }
+widgets = { path = "../widgets" }
 
 [dev-dependencies]
 tokio.workspace = true

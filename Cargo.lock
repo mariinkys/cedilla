@@ -1788,6 +1788,7 @@ dependencies = [
  "open",
  "reqwest",
  "tokio",
+ "widgets",
 ]
 
 [[package]]

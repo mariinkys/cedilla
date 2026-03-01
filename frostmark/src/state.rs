@@ -5,7 +5,6 @@
 
 use std::collections::{HashMap, HashSet};
 
-use cosmic::iced::widget;
 use html5ever::{ParseOpts, tendril::TendrilSink};
 use markup5ever_rcdom::RcDom;
 
@@ -32,7 +31,7 @@ use crate::structs::{UpdateMsg, UpdateMsgKind};
 pub struct MarkState {
     pub(crate) dom: RcDom,
 
-    pub(crate) selection_state: HashMap<String, widget::text_editor::Content>,
+    pub(crate) selection_state: HashMap<String, widgets::text_editor::Content>,
     pub(crate) dropdown_state: HashMap<usize, bool>,
 }
 
@@ -56,6 +55,7 @@ impl MarkState {
         let mut selection_state = HashMap::new();
         let mut dropdown_state = HashMap::new();
         let mut dropdown_counter = 0;
+
         find_state(
             &dom.document,
             &mut selection_state,
@@ -164,7 +164,7 @@ impl Default for MarkState {
 
 fn find_state(
     node: &markup5ever_rcdom::Node,
-    selection_state: &mut HashMap<String, widget::text_editor::Content>,
+    selection_state: &mut HashMap<String, widgets::text_editor::Content>,
     dropdown_state: &mut HashMap<usize, bool>,
     dropdown_counter: &mut usize,
     scan_text: bool,
@@ -197,7 +197,7 @@ fn find_state(
         }
         markup5ever_rcdom::NodeData::Text { contents } if scan_text => {
             let contents = contents.borrow().to_string();
-            let v = widget::text_editor::Content::with_text(&contents);
+            let v = widgets::text_editor::Content::with_text(&contents);
             selection_state.insert(contents.clone(), v);
         }
         _ => {

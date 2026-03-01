@@ -13,6 +13,7 @@ use crate::{
     },
     widgets::{link_text, underline},
 };
+use widgets::TextEditor;
 
 use super::structs::ChildData;
 
@@ -24,7 +25,7 @@ pub trait ValidTheme:
     widget::button::Catalog
     + widget::text::Catalog
     + widget::rule::Catalog
-    + widget::text_editor::Catalog
+    + widgets::text_editor::Catalog
     + widget::checkbox::Catalog
 {
 }
@@ -33,7 +34,7 @@ impl<T> ValidTheme for T where
     T: widget::button::Catalog
         + widget::text::Catalog
         + widget::rule::Catalog
-        + widget::text_editor::Catalog
+        + widgets::text_editor::Catalog
         + widget::checkbox::Catalog
 {
 }
@@ -496,7 +497,8 @@ impl<'a, M: Clone + 'static, T: ValidTheme + 'a> MarkWidget<'a, M, T> {
                 })
             };
 
-            let editor = widget::text_editor(state)
+            let editor = TextEditor::new(state)
+                .is_code_block(true)
                 .size(size)
                 .padding(5)
                 .font(self.font_mono)

@@ -134,6 +134,7 @@ where
     wrapping: Wrapping,
     ellipsize: Ellipsize,
     retain_focus_on_external_click: bool,
+    is_code_block: bool,
     class: Theme::Class<'a>,
     key_binding: Option<Box<dyn Fn(KeyPress) -> Option<Binding<Message>> + 'a>>,
     on_edit: Option<Box<dyn Fn(Action) -> Message + 'a>>,
@@ -164,6 +165,7 @@ where
             wrapping: Wrapping::default(),
             ellipsize: Ellipsize::default(),
             retain_focus_on_external_click: false,
+            is_code_block: false,
             class: <Theme as Catalog>::default(),
             key_binding: None,
             on_edit: None,
@@ -224,8 +226,14 @@ where
     }
 
     /// Controls wether to lose the text selection on external click
-    pub fn retain_focus_on_external_click(mut self, retain: bool) -> Self {
-        self.retain_focus_on_external_click = retain;
+    pub fn retain_focus_on_external_click(mut self, value: bool) -> Self {
+        self.retain_focus_on_external_click = value;
+        self
+    }
+
+    /// If this text editor is used as a codeblock (changes styling)
+    pub fn is_code_block(mut self, value: bool) -> Self {
+        self.is_code_block = value;
         self
     }
 
@@ -310,6 +318,7 @@ where
             wrapping: self.wrapping,
             ellipsize: self.ellipsize,
             retain_focus_on_external_click: self.retain_focus_on_external_click,
+            is_code_block: self.is_code_block,
             class: self.class,
             key_binding: self.key_binding,
             on_edit: self.on_edit,
@@ -332,7 +341,7 @@ where
 
     /// Sets the style of the [`TextEditor`].
     #[must_use]
-    pub fn style(mut self, style: impl Fn(&Theme, Status) -> Style + 'a) -> Self
+    pub fn style(mut self, style: impl Fn(&Theme, Status, bool) -> Style + 'a) -> Self
     where
         Theme::Class<'a>: From<StyleFn<'a, Theme>>,
     {
@@ -940,7 +949,11 @@ where
             |highlight| (self.highlighter_format)(highlight, theme),
         );
 
-        let style = theme.style(&self.class, self.last_status.unwrap_or(Status::Active));
+        let style = theme.style(
+            &self.class,
+            self.last_status.unwrap_or(Status::Active),
+            self.is_code_block,
+        );
 
         renderer.fill_quad(
             renderer::Quad {
@@ -1404,11 +1417,11 @@ pub trait Catalog: cosmic::iced::theme::Base {
     fn default<'a>() -> Self::Class<'a>;
 
     /// The [`Style`] of a class with the given status.
-    fn style(&self, class: &Self::Class<'_>, status: Status) -> Style;
+    fn style(&self, class: &Self::Class<'_>, status: Status, is_code_block: bool) -> Style;
 }
 
 /// A styling function for a [`TextEditor`].
-pub type StyleFn<'a, Theme> = Box<dyn Fn(&Theme, Status) -> Style + 'a>;
+pub type StyleFn<'a, Theme> = Box<dyn Fn(&Theme, Status, bool) -> Style + 'a>;
 
 impl Catalog for Theme {
     type Class<'a> = StyleFn<'a, Self>;
@@ -1417,16 +1430,16 @@ impl Catalog for Theme {
         Box::new(default)
     }
 
-    fn style(&self, class: &Self::Class<'_>, status: Status) -> Style {
-        class(self, status)
+    fn style(&self, class: &Self::Class<'_>, status: Status, is_code_block: bool) -> Style {
+        class(self, status, is_code_block)
     }
 }
 
 /// The default style of a [`TextEditor`].
-pub fn default(theme: &Theme, _status: Status) -> Style {
+pub fn default(theme: &Theme, _status: Status, is_code_block: bool) -> Style {
     let palette = theme.cosmic();
 
-    Style {
+    let base = Style {
         background: Background::Color(Color::TRANSPARENT),
         border: Border {
             radius: 0.0.into(),
@@ -1437,31 +1450,21 @@ pub fn default(theme: &Theme, _status: Status) -> Style {
         placeholder: palette.on_bg_color().into(),
         value: palette.on_bg_color().into(),
         selection: palette.accent.base.into(),
-    }
+    };
 
-    // match status {
-    //     Status::Active => active,
-    //     Status::Hovered => Style {
-    //         border: Border {
-    //             color: palette.accent.base.into(),
-    //             ..active.border
-    //         },
-    //         ..active
-    //     },
-    //     Status::Focused => Style {
-    //         border: Border {
-    //             color: palette.accent.base.into(),
-    //             width: 2.0,
-    //             ..active.border
-    //         },
-    //         ..active
-    //     },
-    //     Status::Disabled => Style {
-    //         background: Background::Color(palette.background.component.base.into()),
-    //         value: palette.on_bg_component_color().into(),
-    //         ..active
-    //     },
-    // }
+    if is_code_block {
+        Style {
+            background: Background::Color(palette.background.component.base.into()),
+            border: Border {
+                radius: 4.0.into(),
+                width: 1.0,
+                color: palette.bg_divider().into(),
+            },
+            ..base
+        }
+    } else {
+        base
+    }
 }
 
 #[cfg(target_os = "macos")]
