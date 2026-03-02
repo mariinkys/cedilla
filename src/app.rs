@@ -1704,12 +1704,18 @@ fn cedilla_main_view<'a>(
 
     let create_editor = || {
         container(responsive(|size| {
+            let highlighter_theme = match app_config.app_theme {
+                AppTheme::Dark => highlighter::Theme::Base16Ocean,
+                AppTheme::Light => highlighter::Theme::InspiredGitHub,
+                AppTheme::System => highlighter::Theme::Base16Ocean,
+            };
+
             widget::id_container(
                 scrollable(
                     TextEditor::new(editor_content)
                         .highlight_with::<highlighter::Highlighter>(
                             highlighter::Settings {
-                                theme: highlighter::Theme::InspiredGitHub,
+                                theme: highlighter_theme,
                                 token: path
                                     .as_ref()
                                     .and_then(|path| path.extension()?.to_str())
@@ -1765,6 +1771,12 @@ fn cedilla_main_view<'a>(
                 PaneContent::Preview => (fl!("preview"), "view-paged-symbolic"),
             };
 
+            let highlighter_theme = match app_config.app_theme {
+                AppTheme::Dark => highlighter::Theme::Base16Ocean,
+                AppTheme::Light => highlighter::Theme::InspiredGitHub,
+                AppTheme::System => highlighter::Theme::Base16Ocean,
+            };
+
             let pane_content: Element<'a, Message> = match content {
                 PaneContent::Editor => create_editor().into(),
                 PaneContent::Preview => container(
@@ -1773,9 +1785,8 @@ fn cedilla_main_view<'a>(
                             .on_updating_state(Message::UpdateMarkState)
                             .on_clicking_link(Message::LaunchUrl)
                             .text_size(18.)
-                            .code_highlight_theme(cosmic::iced::highlighter::Theme::InspiredGitHub)
+                            .code_highlight_theme(highlighter_theme)
                             .on_drawing_image(|info| {
-                                // TODO: SVGs
                                 if let Some(image) = images.get(info.url).cloned() {
                                     let mut img = widget::image(image);
                                     if let Some(w) = info.width {
@@ -1821,7 +1832,16 @@ fn cedilla_main_view<'a>(
 
     let status_bar: Element<Message> = {
         let file_path = match path.as_deref().and_then(Path::to_str) {
-            Some(path) => text(path).size(12),
+            Some(path) => {
+                if path.starts_with(&app_config.vault_path) {
+                    let relative = path
+                        .trim_start_matches(&*app_config.vault_path)
+                        .trim_start_matches('/');
+                    text(format!("Cedilla Vault/{relative}")).size(12)
+                } else {
+                    text(path).size(12)
+                }
+            }
             None => text(fl!("new-file")).size(12),
         };
 
