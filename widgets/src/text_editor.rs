@@ -162,7 +162,7 @@ where
             min_height: 0.0,
             max_height: f32::INFINITY,
             padding: Padding::new(5.0),
-            wrapping: Wrapping::default(),
+            wrapping: Wrapping::WordOrGlyph,
             ellipsize: Ellipsize::default(),
             retain_focus_on_external_click: false,
             is_code_block: false,
