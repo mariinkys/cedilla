@@ -10,8 +10,8 @@
 
 <h3>A markdown text editor for the COSMIC™ desktop</h3>
 
-<img src="./resources/screenshots/main-gif-light.gif" width=650>
-<img src="./resources/screenshots/second-gif-light.gif" width=650>
+<img src="./resources/screenshots/main-light.png" width=350>
+<img src="./resources/screenshots/main-dark.png" width=350>
 
 <br><br>
 
@@ -22,20 +22,7 @@
 
 ## Note
 
-This is a WIP project that may or may not be released eventually.
-
-## TODO/Ideas
-
-- [X] Support tables
-- [X] Support rules 
-- [X] Config support 
-- [X] Add vault/project sidebar
-- [X] Ctrl-Z
-- [X] Helper headerbar with options to format text 
-- [X] Remember view state on close (navabar and preview toggle), also allow to resume from last open file on app open 
-- [X] Optional scrollbar sync
-- [X] Support html 
-- [ ] PDF Exporting
+This is a WIP project that will be released, eventually.
 
 
 ## Install
