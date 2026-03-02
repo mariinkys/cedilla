@@ -10,6 +10,7 @@
 
 <h3>A markdown text editor for the COSMIC™ desktop</h3>
 
+<img src="./resources/screenshots/showcase.gif" width=750>
 <img src="./resources/screenshots/main-light.png" width=350>
 <img src="./resources/screenshots/main-dark.png" width=350>
 
