@@ -197,7 +197,8 @@ fn find_state(
         }
         markup5ever_rcdom::NodeData::Text { contents } if scan_text => {
             let contents = contents.borrow().to_string();
-            let v = widgets::text_editor::Content::with_text(&contents);
+            let trimmed = contents.trim_end_matches('\n').to_string();
+            let v = widgets::text_editor::Content::with_text(&trimmed);
             selection_state.insert(contents.clone(), v);
         }
         _ => {
