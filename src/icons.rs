@@ -50,6 +50,7 @@ impl IconCache {
         bundle!("helperbar/link-symbolic", 18);
         bundle!("helperbar/numbered-list-symbolic", 18);
         bundle!("helperbar/rule-symbolic", 18);
+        bundle!("helperbar/pdf-symbolic", 18);
 
         Self { cache }
     }

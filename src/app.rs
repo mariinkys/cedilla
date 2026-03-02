@@ -3,34 +3,35 @@
 use crate::app::app_menu::MenuAction;
 use crate::app::context_page::ContextPage;
 use crate::app::core::project::ProjectNode;
-use crate::app::core::utils::{self, CedillaToast};
+use crate::app::core::utils::{self, CedillaToast, Image};
 use crate::app::dialogs::{DialogPage, DialogState};
-use crate::app::widgets::{TextEditor, markdown, sensor, text_editor};
 use crate::config::{AppTheme, BoolState, CedillaConfig, ConfigInput, ShowState};
 use crate::key_binds::key_binds;
 use crate::{fl, icons};
 use cosmic::app::context_drawer;
 use cosmic::iced::{Alignment, Event, Length, Padding, Subscription, highlighter, window};
 use cosmic::iced_core::keyboard::{Key, Modifiers};
-use cosmic::iced_widget::{center, column, row, tooltip};
+use cosmic::iced_widget::{center, column, row, scrollable, tooltip};
 use cosmic::widget::menu::Action;
+use cosmic::widget::space::horizontal;
 use cosmic::widget::{self, about::About, menu};
 use cosmic::widget::{
-    Space, ToastId, Toasts, button, container, nav_bar, pane_grid, responsive, scrollable,
-    segmented_button, text, toaster,
+    ToastId, Toasts, button, container, image, nav_bar, pane_grid, responsive, segmented_button,
+    svg, text, text_input, toaster,
 };
 use cosmic::{prelude::*, surface, theme};
+use frostmark::{MarkState, MarkWidget, UpdateMsg};
 use slotmap::Key as SlotMapKey;
-use std::collections::{HashMap, VecDeque};
+use std::collections::{HashMap, HashSet, VecDeque};
 use std::path::{Path, PathBuf};
+use std::process;
 use std::sync::Arc;
-use std::time::Duration;
+use widgets::{TextEditor, text_editor};
 
 pub mod app_menu;
 mod context_page;
 mod core;
 mod dialogs;
-mod widgets;
 
 const REPOSITORY: &str = env!("CARGO_PKG_REPOSITORY");
 
@@ -65,6 +66,8 @@ pub struct AppModel {
     app_themes: Vec<String>,
     /// Currently selected path on the navbar (i need these for accurate file creadtion deletion...)
     selected_nav_path: Option<PathBuf>,
+    /// Gotenberg client, needed for Pdf exporting
+    gotenberg_client: gotenberg_pdf::Client,
     /// Application State
     state: State,
 }
@@ -78,10 +81,14 @@ enum State {
         path: Option<PathBuf>,
         /// Text Editor Content
         editor_content: text_editor::Content,
-        /// Images in the markdown
-        markdown_images: HashMap<markdown::Url, ImageState>,
-        /// Markdown preview items
-        items: Vec<markdown::Item>,
+        /// Markdown Preview state
+        markstate: MarkState,
+        /// Images in the Markdown preview
+        images: HashMap<String, image::Handle>,
+        /// SVGs in the Markdown preview
+        svgs: HashMap<String, svg::Handle>,
+        /// Keep track of images in progress/downloading
+        images_in_progress: HashSet<String>,
         /// Track if any changes have been made to the current file
         is_dirty: bool,
         /// Pane grid state
@@ -102,18 +109,18 @@ enum PaneContent {
     Preview,
 }
 
-/// State of the images in the markdown file
-enum ImageState {
-    Loading,
-    Ready(widget::image::Handle),
-    Failed,
-}
-
 /// State of the markdown preview in the app
 #[derive(Debug, Clone)]
 pub enum PreviewState {
     Hidden,
     Shown,
+}
+
+/// Possible actions after asking to discard changes in the warning [`DialogPage`]
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum DiscardChangesAction {
+    CloseApp,
+    OpenFile(PathBuf),
 }
 
 /// Messages emitted by the application and its widgets.
@@ -161,6 +168,8 @@ pub enum Message {
     Edit(text_editor::Action),
     /// Callback after saving the current file
     FileSaved(Result<PathBuf, anywho::Error>),
+    /// Callback after asking to close a file discarding changes
+    DiscardChanges(DiscardChangesAction),
     /// Deletes the given node entity of the navbar folder or file
     DeleteNode(cosmic::widget::segmented_button::Entity),
     /// Renames the given node entity of the navbar folder or file
@@ -172,58 +181,31 @@ pub enum Message {
     /// Callback after asking to move the vault
     VaultMoved(Result<PathBuf, anywho::Error>),
 
+    /// Update the HTML renderer state
+    UpdateMarkState(UpdateMsg),
+    /// Callback after a Markdown image has been downloaded
+    ImageDownloaded(Result<Image, anywho::Error>),
     /// Set's the preview to the desired state
     SetPreviewState(PreviewState),
     /// Pane grid resized callback
     PaneResized(pane_grid::ResizeEvent),
     /// Pane grid dragged callback
     PaneDragged(pane_grid::DragEvent),
-    /// Triggered when an image becomes visible
-    ImageShown(markdown::Url),
-    /// Callback after downloading/loading an image
-    ImageLoaded(markdown::Url, Result<widget::image::Handle, String>),
+    /// Scrollable position changed
+    ScrollChanged(widget::Id, scrollable::Viewport),
     /// Apply formatting to selected text
     ApplyFormatting(utils::SelectionAction),
     /// Undo requested
     Undo,
     /// Redo requested
     Redo,
+    /// Export current document to PDF
+    ExportPDF,
 
     /// Callback after input on the Config [`ContextPage`]
     ConfigInput(ConfigInput),
     /// Callback after using asks to close the app
-    AppCloseRequested,
-}
-
-struct MarkdownViewer<'a> {
-    images: &'a HashMap<markdown::Url, ImageState>,
-}
-
-impl<'a> markdown::Viewer<'a, cosmic::theme::Theme, cosmic::iced_widget::Renderer>
-    for MarkdownViewer<'a>
-{
-    fn image(
-        &self,
-        _settings: markdown::Settings,
-        url: &'a markdown::Url,
-        _title: &'a str,
-        _alt: &markdown::Text,
-    ) -> Element<'a, markdown::MarkdownMessage> {
-        match self.images.get(url) {
-            Some(ImageState::Ready(handle)) => widget::image(handle.clone())
-                .content_fit(cosmic::iced::ContentFit::Contain)
-                .width(Length::Shrink)
-                .height(Length::Shrink)
-                .into(),
-            Some(ImageState::Loading) => text("Loading image...").into(),
-            Some(ImageState::Failed) => text("Failed to load image").into(),
-            None => sensor(text("Loading..."))
-                .key_ref(url.as_str())
-                .delay(Duration::from_millis(500))
-                .on_show(|_size| markdown::MarkdownMessage::ImageShown(url.clone()))
-                .into(),
-        }
-    }
+    AppCloseRequested(window::Id),
 }
 
 #[derive(Copy, Clone, Debug, Eq, PartialEq)]
@@ -279,6 +261,8 @@ impl cosmic::Application for AppModel {
             .developers([("mariinkys", "kysdev.owjga@aleeas.com")])
             .comments("\"Pop Icons\" by System76 is licensed under CC-SA-4.0");
 
+        let gotenberg_url = flags.config.gotenberg_url.clone();
+
         // Construct the app model with the runtime's core.
         let mut app = AppModel {
             toasts: Toasts::new(Message::CloseToast),
@@ -295,6 +279,7 @@ impl cosmic::Application for AppModel {
             config: flags.config,
             app_themes: vec![fl!("match-desktop"), fl!("dark"), fl!("light")],
             selected_nav_path: None,
+            gotenberg_client: gotenberg_pdf::Client::new(&gotenberg_url),
             state: State::Loading,
         };
 
@@ -403,6 +388,7 @@ impl cosmic::Application for AppModel {
 
         if !self.core().is_condensed() {
             nav = nav.max_width(280);
+            nav = nav.width(Length::Fixed(280.)); // remove if it ever get's fixed (needed right now in iced-rebase branch)
         }
 
         Some(
@@ -479,6 +465,18 @@ impl cosmic::Application for AppModel {
     }
 
     fn on_nav_select(&mut self, id: nav_bar::Id) -> Task<cosmic::Action<Message>> {
+        let State::Ready {
+            editor_content,
+            is_dirty,
+            history_index,
+            path,
+            ..
+        } = &self.state
+        else {
+            return Task::none();
+        };
+        let old_path = path;
+
         let node_opt = match self.nav_model.data_mut::<ProjectNode>(id) {
             Some(node) => {
                 if let ProjectNode::Folder { open, .. } = node {
@@ -515,12 +513,30 @@ impl cosmic::Application for AppModel {
                         Task::none()
                     }
                     ProjectNode::File { path, .. } => {
-                        // store parent directory of selected file
-                        self.selected_nav_path = path.parent().map(|p| p.to_path_buf());
+                        // we don't do this here anymore because if the user discard changes... we don't want to change the selected_nav_path
+                        // it's better to do this after opening a file if the path opened is inside the vault
+                        //store parent directory of selected file
+                        //self.selected_nav_path = path.parent().map(|p| p.to_path_buf());
 
-                        Task::perform(utils::files::load_file(path), |res| {
-                            cosmic::action::app(Message::OpenFile(res))
-                        })
+                        if *is_dirty {
+                            if (old_path.is_some() && *history_index != 0)
+                                || (old_path.is_none() && !editor_content.text().trim().is_empty())
+                            {
+                                Task::done(cosmic::action::app(Message::DialogAction(
+                                    dialogs::DialogAction::OpenConfirmCloseFileDialog(
+                                        DiscardChangesAction::OpenFile(path),
+                                    ),
+                                )))
+                            } else {
+                                Task::perform(utils::files::load_file(path), |res| {
+                                    cosmic::action::app(Message::OpenFile(res))
+                                })
+                            }
+                        } else {
+                            Task::perform(utils::files::load_file(path), |res| {
+                                cosmic::action::app(Message::OpenFile(res))
+                            })
+                        }
                     }
                 }
             }
@@ -553,8 +569,9 @@ impl cosmic::Application for AppModel {
             State::Ready {
                 path,
                 editor_content,
-                markdown_images,
-                items,
+                markstate,
+                images,
+                svgs,
                 is_dirty,
                 panes,
                 preview_state,
@@ -563,8 +580,9 @@ impl cosmic::Application for AppModel {
                 &self.config,
                 path,
                 editor_content,
-                markdown_images,
-                items,
+                markstate,
+                images,
+                svgs,
                 is_dirty,
                 panes,
                 preview_state,
@@ -585,8 +603,6 @@ impl cosmic::Application for AppModel {
         let subscriptions = vec![
             // Watch for key_bind inputs
             cosmic::iced::event::listen_with(|event, status, _| match event {
-                Event::Window(window::Event::Closed) => Some(Message::AppCloseRequested),
-                Event::Window(window::Event::CloseRequested) => Some(Message::AppCloseRequested),
                 Event::Keyboard(cosmic::iced::keyboard::Event::KeyPressed {
                     key,
                     modifiers,
@@ -613,6 +629,10 @@ impl cosmic::Application for AppModel {
         ];
 
         Subscription::batch(subscriptions)
+    }
+
+    fn on_close_requested(&self, id: window::Id) -> Option<Message> {
+        Some(Message::AppCloseRequested(id))
     }
 
     /// Handles messages emitted by the application and its widgets.
@@ -755,7 +775,9 @@ impl cosmic::Application for AppModel {
                     crate::config::BoolState::No => None,
                 };
 
-                if let Some(p) = path {
+                if let Some(p) = path
+                    && p.exists()
+                {
                     // store parent directory of selected file
                     self.selected_nav_path = p.parent().map(|p| p.to_path_buf());
 
@@ -771,8 +793,10 @@ impl cosmic::Application for AppModel {
                 self.state = State::Ready {
                     path: None,
                     editor_content: text_editor::Content::new(),
-                    markdown_images: HashMap::new(),
-                    items: vec![],
+                    markstate: MarkState::with_html_and_markdown(""),
+                    images: HashMap::new(),
+                    svgs: HashMap::new(),
+                    images_in_progress: HashSet::new(),
                     is_dirty: true,
                     panes,
                     preview_state,
@@ -789,8 +813,10 @@ impl cosmic::Application for AppModel {
                 self.state = State::Ready {
                     path: None,
                     editor_content: text_editor::Content::new(),
-                    markdown_images: HashMap::new(),
-                    items: vec![],
+                    markstate: MarkState::with_html_and_markdown(""),
+                    images: HashMap::new(),
+                    svgs: HashMap::new(),
+                    images_in_progress: HashSet::new(),
                     is_dirty: true,
                     panes,
                     preview_state: PreviewState::Shown,
@@ -834,8 +860,10 @@ impl cosmic::Application for AppModel {
                 self.state = State::Ready {
                     path: Some(file_path),
                     editor_content: text_editor::Content::new(),
-                    markdown_images: HashMap::new(),
-                    items: vec![],
+                    markstate: MarkState::with_html_and_markdown(""),
+                    images: HashMap::new(),
+                    svgs: HashMap::new(),
+                    images_in_progress: HashSet::new(),
                     is_dirty: true,
                     panes,
                     preview_state: PreviewState::Shown,
@@ -918,30 +946,54 @@ impl cosmic::Application for AppModel {
             }
             Message::OpenFile(result) => match result {
                 Ok((path, content)) => {
+                    // store parent directory of selected file in nav_path only if path is inside vault
+                    let vault_path = PathBuf::from(&self.config.vault_path);
+                    if path.starts_with(&vault_path) {
+                        self.selected_nav_path = path.parent().map(|p| p.to_path_buf());
+                    }
+
                     // Create initial pane configuration (TODO: Move this to a helper func (also used in NewFile))
                     let (mut panes, first_pane) = pane_grid::State::new(PaneContent::Editor);
                     panes.split(pane_grid::Axis::Vertical, first_pane, PaneContent::Preview);
 
+                    let markstate = MarkState::with_html_and_markdown(content.as_ref());
+                    let images_in_progress = HashSet::new();
+
                     self.state = State::Ready {
                         path: Some(path),
                         editor_content: text_editor::Content::with_text(content.as_ref()),
-                        markdown_images: HashMap::new(),
-                        items: markdown::parse(content.as_ref()).collect(),
+                        markstate,
+                        images: HashMap::new(),
+                        svgs: HashMap::new(),
+                        images_in_progress,
                         is_dirty: false,
                         panes,
                         preview_state: PreviewState::Shown,
                         history: vec![content.to_string()],
                         history_index: 0,
                     };
+
+                    if let State::Ready {
+                        markstate,
+                        images_in_progress,
+                        path,
+                        ..
+                    } = &mut self.state
+                    {
+                        return utils::images::download_images(markstate, images_in_progress, path);
+                    }
+
                     Task::none()
                 }
                 Err(e) => self.update(Message::AddToast(CedillaToast::new(e))),
             },
             Message::Edit(action) => {
                 let State::Ready {
+                    path,
                     editor_content,
                     is_dirty,
-                    items,
+                    markstate,
+                    images_in_progress,
                     history,
                     history_index,
                     ..
@@ -952,7 +1004,7 @@ impl cosmic::Application for AppModel {
 
                 let was_edit = action.is_edit();
                 editor_content.perform(action);
-                *items = markdown::parse(editor_content.text().as_ref()).collect();
+                *markstate = MarkState::with_html_and_markdown(editor_content.text().as_ref());
 
                 if was_edit {
                     *is_dirty = true;
@@ -970,7 +1022,7 @@ impl cosmic::Application for AppModel {
                     }
                 }
 
-                Task::none()
+                utils::images::download_images(markstate, images_in_progress, path)
             }
             Message::FileSaved(result) => match result {
                 Ok(new_path) => {
@@ -984,6 +1036,16 @@ impl cosmic::Application for AppModel {
                     self.update(Message::AddToast(CedillaToast::new("File Saved!")))
                 }
                 Err(e) => self.update(Message::AddToast(CedillaToast::new(e))),
+            },
+            Message::DiscardChanges(action) => match action {
+                DiscardChangesAction::CloseApp => {
+                    process::exit(0);
+                }
+                DiscardChangesAction::OpenFile(path) => {
+                    Task::perform(utils::files::load_file(path), |res| {
+                        cosmic::action::app(Message::OpenFile(res))
+                    })
+                }
             },
             Message::DeleteNode(entity) => {
                 let Some(node) = self.nav_model.data::<ProjectNode>(entity).cloned() else {
@@ -1180,6 +1242,32 @@ impl cosmic::Application for AppModel {
                 }
             }
 
+            Message::UpdateMarkState(message) => {
+                if let State::Ready { markstate, .. } = &mut self.state {
+                    markstate.update(message)
+                }
+                Task::none()
+            }
+            Message::ImageDownloaded(res) => {
+                let State::Ready { images, svgs, .. } = &mut self.state else {
+                    return Task::none();
+                };
+
+                match res {
+                    Ok(image) => {
+                        if image.is_svg {
+                            svgs.insert(image.url, svg::Handle::from_memory(image.bytes));
+                        } else {
+                            images.insert(image.url, image::Handle::from_bytes(image.bytes));
+                        }
+                    }
+                    Err(err) => {
+                        eprintln!("Couldn't download image: {err}");
+                    }
+                }
+
+                Task::none()
+            }
             Message::SetPreviewState(desired_state) => {
                 let State::Ready { preview_state, .. } = &mut self.state else {
                     return Task::none();
@@ -1206,49 +1294,34 @@ impl cosmic::Application for AppModel {
                 Task::none()
             }
             Message::PaneDragged(_) => Task::none(),
-
-            Message::ImageShown(url) => {
-                let State::Ready {
-                    markdown_images, ..
-                } = &mut self.state
-                else {
+            Message::ScrollChanged(source_id, viewport) => {
+                let State::Ready { .. } = &mut self.state else {
                     return Task::none();
                 };
 
-                if markdown_images.contains_key(&url) {
+                if self.config.scrollbar_sync != BoolState::Yes {
                     return Task::none();
                 }
 
-                markdown_images.insert(url.clone(), ImageState::Loading);
+                let offset = viewport.absolute_offset();
 
-                let url_for_closure = url.clone();
-                Task::perform(utils::images::load_image(url), move |result| {
-                    cosmic::action::app(Message::ImageLoaded(url_for_closure.clone(), result))
-                })
-            }
-            Message::ImageLoaded(url, result) => {
-                let State::Ready {
-                    markdown_images, ..
-                } = &mut self.state
-                else {
-                    return Task::none();
+                let target_id = if source_id == editor_scrollable_id() {
+                    preview_scrollable_id()
+                } else {
+                    editor_scrollable_id()
                 };
 
-                let state = match result {
-                    Ok(handle) => ImageState::Ready(handle),
-                    Err(_) => ImageState::Failed,
-                };
-
-                markdown_images.insert(url, state);
-
-                Task::none()
+                scrollable::scroll_to(target_id, offset.into()).map(cosmic::action::app)
             }
+
             Message::ApplyFormatting(action) => self.apply_formatting_to_selection(action),
             Message::Undo => {
                 let State::Ready {
+                    path,
                     editor_content,
+                    markstate,
+                    images_in_progress,
                     is_dirty,
-                    items,
                     history,
                     history_index,
                     ..
@@ -1261,15 +1334,18 @@ impl cosmic::Application for AppModel {
                     *history_index -= 1;
                     let snapshot = history[*history_index].clone();
                     *editor_content = text_editor::Content::with_text(&snapshot);
-                    *items = markdown::parse(&snapshot).collect();
+                    *markstate = MarkState::with_html_and_markdown(&snapshot);
                     *is_dirty = *history_index != 0;
                 }
-                Task::none()
+
+                utils::images::download_images(markstate, images_in_progress, path)
             }
             Message::Redo => {
                 let State::Ready {
+                    path,
                     editor_content,
-                    items,
+                    markstate,
+                    images_in_progress,
                     history,
                     history_index,
                     ..
@@ -1282,9 +1358,52 @@ impl cosmic::Application for AppModel {
                     *history_index += 1;
                     let snapshot = history[*history_index].clone();
                     *editor_content = text_editor::Content::with_text(&snapshot);
-                    *items = markdown::parse(&snapshot).collect();
+                    *markstate = MarkState::with_html_and_markdown(&snapshot);
                 }
-                Task::none()
+
+                utils::images::download_images(markstate, images_in_progress, path)
+            }
+            Message::ExportPDF => {
+                let State::Ready {
+                    editor_content,
+                    path,
+                    ..
+                } = &mut self.state
+                else {
+                    return Task::none();
+                };
+
+                let content = editor_content.text();
+
+                if self.config.is_gotenberg_configured() && !content.trim().is_empty() {
+                    let client = self.gotenberg_client.clone();
+                    let file_path = path.clone();
+
+                    Task::perform(
+                        async move {
+                            match utils::files::open_pdf_file_saver().await {
+                                Some(path) => Some(
+                                    utils::pdf::export_pdf(client, file_path, content, path).await,
+                                ),
+                                // Error selecting where to save the file
+                                None => None,
+                            }
+                        },
+                        |res| match res {
+                            Some(result) => match result {
+                                Ok(_) => cosmic::action::app(Message::AddToast(CedillaToast::new(
+                                    "Exported Correctly",
+                                ))),
+                                Err(e) => {
+                                    cosmic::action::app(Message::AddToast(CedillaToast::new(e)))
+                                }
+                            },
+                            None => cosmic::action::none(),
+                        },
+                    )
+                } else {
+                    Task::none()
+                }
             }
 
             #[allow(clippy::collapsible_if)]
@@ -1347,9 +1466,38 @@ impl cosmic::Application for AppModel {
                     }
                     Task::none()
                 }
+                ConfigInput::ScrollbarSync(state) => {
+                    if let Some(handler) = &self.config_handler {
+                        if let Err(err) = self.config.set_scrollbar_sync(handler, state) {
+                            eprintln!("{err}");
+                            // even if it fails we update the config (it won't get saved after restart)
+                            let mut old_config = self.config.clone();
+                            old_config.scrollbar_sync = state;
+                            self.config = old_config;
+                        }
+                    }
+                    Task::none()
+                }
+                ConfigInput::GotenbergUrlInput(state) => {
+                    if let Some(handler) = &self.config_handler {
+                        if let Err(err) = self.config.set_gotenberg_url(handler, state) {
+                            eprintln!("{err}");
+                        }
+                    }
+                    Task::none()
+                }
+                ConfigInput::GotenbergUrlSave => {
+                    // rebuild the gotenberg client
+                    self.gotenberg_client = gotenberg_pdf::Client::new(&self.config.gotenberg_url);
+
+                    Task::none()
+                }
             },
-            Message::AppCloseRequested => {
+            Message::AppCloseRequested(window_id) => {
                 let State::Ready {
+                    editor_content,
+                    is_dirty,
+                    history_index,
                     preview_state,
                     path,
                     ..
@@ -1357,6 +1505,10 @@ impl cosmic::Application for AppModel {
                 else {
                     return Task::none();
                 };
+
+                if Some(window_id) != self.core.main_window_id() {
+                    return Task::none();
+                }
 
                 if let Some(handler) = &self.config_handler {
                     let current_preview_state = match preview_state {
@@ -1388,7 +1540,23 @@ impl cosmic::Application for AppModel {
                     }
                 }
 
-                cosmic::iced::window::close(window::Id::RESERVED)
+                if *is_dirty {
+                    if (path.is_some() && *history_index != 0)
+                        || (path.is_none() && !editor_content.text().trim().is_empty())
+                    {
+                        println!("TODO: We're here but for some reason it doesn't work");
+                        //self.update(Message::DialogAction(
+                        //    dialogs::DialogAction::OpenConfirmCloseFileDialog(
+                        //        DiscardChangesAction::CloseApp,
+                        //    ),
+                        //))
+                        process::exit(0);
+                    } else {
+                        process::exit(0);
+                    }
+                } else {
+                    process::exit(0);
+                }
             }
         }
     }
@@ -1449,6 +1617,41 @@ impl AppModel {
                         },
                     )),
                 )
+                .add(
+                    widget::settings::item::builder(fl!("scrollbar-sync")).control(
+                        widget::dropdown(
+                            BoolState::all_labels(),
+                            Some(self.config.scrollbar_sync.to_index()),
+                            |index| {
+                                Message::ConfigInput(ConfigInput::ScrollbarSync(
+                                    BoolState::from_index(index),
+                                ))
+                            },
+                        ),
+                    ),
+                )
+                .add(
+                    cosmic::widget::column::with_children(vec![
+                        column![
+                            text::body(fl!("pdf-exporting")),
+                            text::caption(fl!("gotenberg-url"))
+                        ]
+                        .into(),
+                        text_input(fl!("gotenberg-url"), &self.config.gotenberg_url)
+                            .on_input(|v| Message::ConfigInput(ConfigInput::GotenbergUrlInput(v)))
+                            .into(),
+                        row![
+                            button::text(fl!("more-info")).on_press(Message::LaunchUrl(
+                                String::from("https://gotenberg.dev/")
+                            )),
+                            horizontal(),
+                            button::suggested(fl!("apply"))
+                                .on_press(Message::ConfigInput(ConfigInput::GotenbergUrlSave))
+                        ]
+                        .into(),
+                    ])
+                    .spacing(cosmic::theme::spacing().space_xxs),
+                )
                 .into(),
             widget::settings::section()
                 .title(fl!("view"))
@@ -1490,8 +1693,9 @@ fn cedilla_main_view<'a>(
     app_config: &'a CedillaConfig,
     path: &'a Option<PathBuf>,
     editor_content: &'a text_editor::Content,
-    markdown_images: &'a HashMap<url::Url, ImageState>,
-    items: &'a [markdown::Item],
+    markstate: &'a MarkState,
+    images: &'a HashMap<String, image::Handle>,
+    svgs: &'a HashMap<String, svg::Handle>,
     is_dirty: &'a bool,
     panes: &'a pane_grid::State<PaneContent>,
     preview_state: &'a PreviewState,
@@ -1500,24 +1704,35 @@ fn cedilla_main_view<'a>(
 
     let create_editor = || {
         container(responsive(|size| {
-            scrollable(
-                TextEditor::new(editor_content)
-                    .highlight_with::<highlighter::Highlighter>(
-                        highlighter::Settings {
-                            theme: highlighter::Theme::InspiredGitHub,
-                            token: path
-                                .as_ref()
-                                .and_then(|path| path.extension()?.to_str())
-                                .unwrap_or("md")
-                                .to_string(),
-                        },
-                        |highlight, _theme| highlight.to_format(),
-                    )
-                    .padding(0)
-                    .retain_focus_on_external_click(true)
-                    .on_action(Message::Edit),
+            let highlighter_theme = match app_config.app_theme {
+                AppTheme::Dark => highlighter::Theme::Base16Ocean,
+                AppTheme::Light => highlighter::Theme::InspiredGitHub,
+                AppTheme::System => highlighter::Theme::Base16Ocean,
+            };
+
+            widget::id_container(
+                scrollable(
+                    TextEditor::new(editor_content)
+                        .highlight_with::<highlighter::Highlighter>(
+                            highlighter::Settings {
+                                theme: highlighter_theme,
+                                token: path
+                                    .as_ref()
+                                    .and_then(|path| path.extension()?.to_str())
+                                    .unwrap_or("md")
+                                    .to_string(),
+                            },
+                            |highlight, _theme| highlight.to_format(),
+                        )
+                        .padding(0)
+                        .retain_focus_on_external_click(true)
+                        .on_action(Message::Edit),
+                )
+                .id(editor_scrollable_id())
+                .on_scroll(|vp| Message::ScrollChanged(editor_scrollable_id(), vp))
+                .height(Length::Fixed(size.height - 5.)), // This is a bit of a workaround but it works,
+                widget::Id::new("text_editor_widget"),
             )
-            .height(Length::Fixed(size.height - 5.)) // This is a bit of a workaround but it works
             .into()
         }))
         .padding([5, spacing.space_xxs])
@@ -1556,23 +1771,49 @@ fn cedilla_main_view<'a>(
                 PaneContent::Preview => (fl!("preview"), "view-paged-symbolic"),
             };
 
+            let highlighter_theme = match app_config.app_theme {
+                AppTheme::Dark => highlighter::Theme::Base16Ocean,
+                AppTheme::Light => highlighter::Theme::InspiredGitHub,
+                AppTheme::System => highlighter::Theme::Base16Ocean,
+            };
+
             let pane_content: Element<'a, Message> = match content {
                 PaneContent::Editor => create_editor().into(),
-                PaneContent::Preview => container(scrollable(
-                    markdown::view_with(
-                        items,
-                        markdown::Settings::default(),
-                        &MarkdownViewer {
-                            images: markdown_images,
-                        },
+                PaneContent::Preview => container(
+                    scrollable(
+                        MarkWidget::new(markstate)
+                            .on_updating_state(Message::UpdateMarkState)
+                            .on_clicking_link(Message::LaunchUrl)
+                            .text_size(18.)
+                            .code_highlight_theme(highlighter_theme)
+                            .on_drawing_image(|info| {
+                                if let Some(image) = images.get(info.url).cloned() {
+                                    let mut img = widget::image(image);
+                                    if let Some(w) = info.width {
+                                        img = img.width(w);
+                                    }
+                                    if let Some(h) = info.height {
+                                        img = img.height(h);
+                                    }
+                                    img.into()
+                                } else if let Some(svg_f) = svgs.get(info.url).cloned() {
+                                    let mut svg = widget::svg(svg_f);
+                                    if let Some(w) = info.width {
+                                        svg = svg.width(w);
+                                    }
+                                    if let Some(h) = info.height {
+                                        svg = svg.height(h);
+                                    }
+                                    svg.into()
+                                } else {
+                                    "...".into()
+                                }
+                            }),
                     )
-                    .map(|m| match m {
-                        markdown::MarkdownMessage::LinkClicked(url) => {
-                            Message::LaunchUrl(url.to_string())
-                        }
-                        markdown::MarkdownMessage::ImageShown(url) => Message::ImageShown(url),
-                    }),
-                ))
+                    .id(preview_scrollable_id())
+                    .on_scroll(|vp| Message::ScrollChanged(preview_scrollable_id(), vp))
+                    .width(Length::Fill),
+                )
                 .padding(spacing.space_xxs)
                 .width(Length::Fill)
                 .height(Length::Fill)
@@ -1591,7 +1832,16 @@ fn cedilla_main_view<'a>(
 
     let status_bar: Element<Message> = {
         let file_path = match path.as_deref().and_then(Path::to_str) {
-            Some(path) => text(path).size(12),
+            Some(path) => {
+                if path.starts_with(&app_config.vault_path) {
+                    let relative = path
+                        .trim_start_matches(&*app_config.vault_path)
+                        .trim_start_matches('/');
+                    text(format!("Cedilla Vault/{relative}")).size(12)
+                } else {
+                    text(path).size(12)
+                }
+            }
             None => text(fl!("new-file")).size(12),
         };
 
@@ -1602,19 +1852,19 @@ fn cedilla_main_view<'a>(
         };
 
         let position = {
-            let (line, column) = editor_content.cursor_position();
-            text(format!("{}:{}", line + 1, column + 1)).size(12)
+            let cursor = editor_content.cursor();
+            text(format!(
+                "{}:{}",
+                cursor.position.line + 1,
+                cursor.position.column + 1
+            ))
+            .size(12)
         };
 
         container(
-            row![
-                file_path,
-                dirty_indicator,
-                Space::with_width(Length::Fill),
-                position
-            ]
-            .padding(spacing.space_xxs)
-            .spacing(spacing.space_xxs),
+            row![file_path, dirty_indicator, horizontal(), position]
+                .padding(spacing.space_xxs)
+                .spacing(spacing.space_xxs),
         )
         .width(Length::Fill)
         .class(theme::Container::Card)
@@ -1628,14 +1878,14 @@ fn cedilla_main_view<'a>(
                     .on_press(Message::ApplyFormatting(utils::SelectionAction::Bold)),
                 button::icon(icons::get_handle("helperbar/italic-symbolic", 18))
                     .on_press(Message::ApplyFormatting(utils::SelectionAction::Italic)),
-                Space::new(18., 0.),
+                horizontal().width(18.),
                 button::icon(icons::get_handle("helperbar/link-symbolic", 18))
                     .on_press(Message::ApplyFormatting(utils::SelectionAction::Hyperlink)),
                 button::icon(icons::get_handle("helperbar/code-symbolic", 18))
                     .on_press(Message::ApplyFormatting(utils::SelectionAction::Code)),
                 button::icon(icons::get_handle("helperbar/image-symbolic", 18))
                     .on_press(Message::ApplyFormatting(utils::SelectionAction::Image)),
-                Space::new(18., 0.),
+                horizontal().width(18.),
                 button::icon(icons::get_handle("helperbar/bulleted-list-symbolic", 18)).on_press(
                     Message::ApplyFormatting(utils::SelectionAction::BulletedList)
                 ),
@@ -1649,6 +1899,12 @@ fn cedilla_main_view<'a>(
                     .on_press(Message::ApplyFormatting(utils::SelectionAction::Heading1)),
                 button::icon(icons::get_handle("helperbar/rule-symbolic", 18))
                     .on_press(Message::ApplyFormatting(utils::SelectionAction::Rule)),
+                horizontal(),
+                button::icon(icons::get_handle("helperbar/pdf-symbolic", 18)).on_press_maybe(
+                    app_config
+                        .is_gotenberg_configured()
+                        .then_some(Message::ExportPDF)
+                )
             ]
             .padding(spacing.space_xxs)
             .spacing(spacing.space_xxs),
@@ -1679,4 +1935,12 @@ fn cedilla_main_view<'a>(
         .width(Length::Fill)
         .height(Length::Fill)
         .into()
+}
+
+fn editor_scrollable_id() -> widget::Id {
+    widget::Id::new("editor_scroll")
+}
+
+fn preview_scrollable_id() -> widget::Id {
+    widget::Id::new("preview_scroll")
 }

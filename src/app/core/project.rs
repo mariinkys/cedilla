@@ -1,4 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-only
+
 #![allow(clippy::collapsible_if)]
 
 // Code based on System76's, see: https://github.com/pop-os/cosmic-edit/blob/master/src/project.rs

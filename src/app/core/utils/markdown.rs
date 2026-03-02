@@ -1,11 +1,11 @@
+// SPDX-License-Identifier: GPL-3.0
+
 use std::sync::Arc;
 
 use cosmic::Task;
+use widgets::text_editor;
 
-use crate::app::{
-    AppModel, Message, State,
-    widgets::{markdown, text_editor},
-};
+use crate::app::{AppModel, Message, State};
 
 /// Actions that can be performed on the current text selection
 #[derive(Debug, Clone)]
@@ -51,7 +51,6 @@ impl AppModel {
         let State::Ready {
             editor_content,
             is_dirty,
-            items,
             ..
         } = &mut self.state
         else {
@@ -76,7 +75,7 @@ impl AppModel {
         }
 
         *is_dirty = true;
-        *items = markdown::parse(editor_content.text().as_ref()).collect();
+        //*items = markdown::parse(editor_content.text().as_ref()).collect();
 
         Task::none()
     }

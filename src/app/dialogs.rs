@@ -1,8 +1,13 @@
+// SPDX-License-Identifier: GPL-3.0
+
 use std::{collections::VecDeque, path::PathBuf};
 
 use cosmic::{Element, Task, iced::Alignment, theme, widget};
 
-use crate::{app::Message, fl};
+use crate::{
+    app::{DiscardChangesAction, Message},
+    fl,
+};
 
 /// Represents a [`DialogPage`] of the application
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -17,6 +22,8 @@ pub enum DialogPage {
     RenameNode(cosmic::widget::segmented_button::Entity, String),
     /// Move the given entity to a selected folder first entity = what to move, second = selected target folder (None if none chosen yet)
     MoveNode(cosmic::widget::segmented_button::Entity, Option<PathBuf>),
+    /// Dialog for when closing a file with pending changes
+    ConfirmCloseFile(DiscardChangesAction),
 }
 
 impl DialogPage {
@@ -127,7 +134,7 @@ impl DialogPage {
 
                             widget::button::custom(
                                 widget::row::with_children(vec![
-                                    widget::Space::with_width(indent_padding).into(),
+                                    widget::space::horizontal().width(indent_padding).into(),
                                     widget::icon::from_name("folder-symbolic").size(16).into(),
                                     widget::text::body(name.clone()).into(),
                                 ])
@@ -166,6 +173,27 @@ impl DialogPage {
                         widget::scrollable(folder_list).height(cosmic::iced::Length::Fixed(300.0)),
                     )
             }
+            DialogPage::ConfirmCloseFile(action) => widget::dialog()
+                .title(fl!("save-changes-closing"))
+                .primary_action(
+                    widget::button::suggested(fl!("save-file"))
+                        .on_press(Message::DialogAction(DialogAction::DialogComplete)),
+                )
+                .secondary_action(
+                    widget::button::destructive(fl!("discard-changes")).on_press(
+                        Message::DialogAction(DialogAction::DiscardChanges(action.clone())),
+                    ),
+                )
+                .tertiary_action(
+                    widget::button::text(fl!("cancel"))
+                        .on_press(Message::DialogAction(DialogAction::DialogCancel)),
+                )
+                .control(
+                    widget::column::with_children(vec![
+                        widget::text::body(fl!("save-warning")).into(),
+                    ])
+                    .spacing(spacing.space_xxs),
+                ),
         };
 
         Some(dialog.into())
@@ -185,6 +213,10 @@ pub enum DialogAction {
     OpenRenameNodeDialog(cosmic::widget::segmented_button::Entity),
     /// Asks to open the [`DialogPage`] for moving a node in the vault
     OpenMoveNodeDialog(cosmic::widget::segmented_button::Entity),
+    /// Asks to open the [`DialogPage`] for asking confirmation before closing a file
+    OpenConfirmCloseFileDialog(DiscardChangesAction),
+    /// Action after user confirms wants to discard changes on Save dialog
+    DiscardChanges(DiscardChangesAction),
     /// Action after user confirms/ok's/accepts the action of a Dialog
     DialogComplete,
     /// Action after user cancels the action of a Dialog
@@ -243,9 +275,21 @@ impl DialogAction {
                             )));
                         }
                         DialogPage::MoveNode(_, None) => {}
+                        DialogPage::ConfirmCloseFile(action) => match action {
+                            DiscardChangesAction::CloseApp => {
+                                return Task::done(cosmic::action::app(Message::SaveFile));
+                            }
+                            DiscardChangesAction::OpenFile(_file_path) => {
+                                return Task::done(cosmic::action::app(Message::SaveFile));
+                            }
+                        },
                     }
                 }
                 Task::none()
+            }
+            DialogAction::DiscardChanges(action) => {
+                dialog_pages.pop_front();
+                Task::done(cosmic::action::app(Message::DiscardChanges(action)))
             }
             DialogAction::DialogCancel => {
                 dialog_pages.pop_front();
@@ -265,6 +309,10 @@ impl DialogAction {
             }
             DialogAction::OpenMoveNodeDialog(entity) => {
                 dialog_pages.push_back(DialogPage::MoveNode(entity, None));
+                Task::none()
+            }
+            DialogAction::OpenConfirmCloseFileDialog(action) => {
+                dialog_pages.push_back(DialogPage::ConfirmCloseFile(action));
                 Task::none()
             }
         }

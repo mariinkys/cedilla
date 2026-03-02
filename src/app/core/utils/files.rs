@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: GPL-3.0
+
 use anywho::anywho;
 use cosmic::dialog::{ashpd::desktop::file_chooser::SelectedFiles, file_chooser::FileFilter};
 use std::{path::PathBuf, sync::Arc};
@@ -163,6 +165,31 @@ pub async fn open_markdown_file_saver(vault_path: String) -> Option<String> {
                 .glob("*.txt")
                 .glob("*.MD"),
         )
+        .send()
+        .await
+        .unwrap()
+        .response();
+
+    if let Ok(result) = result {
+        result
+            .uris()
+            .iter()
+            .map(|file| file.path().to_string())
+            .collect::<Vec<String>>()
+            .first()
+            .cloned()
+    } else {
+        None
+    }
+}
+
+/// Open a system dialog to select where to save a markdown file, returns the selected file (if any)
+pub async fn open_pdf_file_saver() -> Option<String> {
+    let result = SelectedFiles::save_file()
+        .title("Save File")
+        .accept_label("Save")
+        .modal(true)
+        .filter(FileFilter::new("PDF Files").glob("*.pdf"))
         .send()
         .await
         .unwrap()

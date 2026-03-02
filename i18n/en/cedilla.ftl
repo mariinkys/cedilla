@@ -16,6 +16,9 @@ file-name = File Name
 folder-name = Folder Name
 delete-node = Delete File/Folder
 delete-confirmation = Are you sure you want to delete this file/folder and it's contents?
+save-changes-closing = Save changes before closing?
+save-warning = You have unsaved changes. If you continue without saving, these changes will be lost.
+discard-changes = Discard Changes
 
 <#-- Appearance -->
 appearance = Appearance
@@ -35,6 +38,11 @@ hide = Hide
 last-file = Open the last file when the app starts
 yes = Yes
 no = No
+scrollbar-sync = Sync Preview and Editor scrollbars
+pdf-exporting = PDF Exporting
+gotenberg-url = Set the Gotenberg server URL
+apply = Apply
+more-info = More Info
 
 <#-- Application MenuBar -->
 file = File
