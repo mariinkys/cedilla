@@ -1,10 +1,5 @@
-about = About
-settings = Settings
-repository = Repository
-view = View
+<#-- General -->
 loading = Loading
-support = Support
-
 create = Create
 cancel = Cancel
 delete = Delete
@@ -12,6 +7,14 @@ rename = Rename
 move = Move
 move-to = Move To
 name = Name
+
+<#-- About Page -->
+repository = Repository
+support = Support
+
+<#-- Main App -->
+editor = Editor
+preview = Preview
 file-name = File Name
 folder-name = Folder Name
 delete-node = Delete File/Folder
@@ -47,15 +50,28 @@ text-size = Text Size
 
 <#-- Application MenuBar -->
 file = File
-open-file = Open File
-new-file = New File
-new-folder = New Folder
 new-vault-file = New Vault File
+new-folder = New Folder
+open-file = Open File
 save-file = Save File
+new-file = New File
 
 edit = Edit
 undo = Undo
 redo = Redo
 
-editor = Editor
-preview = Preview
+view = View
+about = About
+settings = Settings
+
+<#-- Helper HeaderBar -->
+bold = Bold
+italic = Italic
+link = Hyperlink
+code = Code
+image = Image
+attachment = Attachment
+bullet-list = Bulleted List
+numbered-list = Numbered List
+checkbox = Checkbox
+horizontal-rule = Horizontal Rule
