@@ -581,7 +581,6 @@ impl cosmic::Application for AppModel {
     /// stopped and started conditionally based on application state, or persist
     /// indefinitely.
     fn subscription(&self) -> Subscription<Self::Message> {
-        // Add subscriptions which are always active.
         let subscriptions = vec![
             // Watch for key_bind inputs
             cosmic::iced::event::listen_with(|event, status, _| match event {
