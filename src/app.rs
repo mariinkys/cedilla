@@ -134,17 +134,18 @@ pub enum Message {
     ToggleContextPage(ContextPage),
     /// Update the application config
     UpdateConfig(CedillaConfig),
-    /// Callback after clicking something in the app menu
-    MenuAction(app_menu::MenuAction),
     /// Needed for responsive menu bar
     Surface(surface::Action),
     /// Executes the appropiate cosmic binding on keyboard shortcut
     Key(Modifiers, Key),
     /// Updates the current state of keyboard modifiers
     Modifiers(Modifiers),
+
+    /// Callback after clicking something in the app menu
+    MenuAction(app_menu::MenuAction),
+
     /// Asks to execute various actions related to the application dialogs
     DialogAction(dialogs::DialogAction),
-
     /// Right click on a NavBar Item
     NavBarContext(segmented_button::Entity),
     /// Fired when a menu item is chosen
@@ -162,12 +163,11 @@ pub enum Message {
     SaveFile,
     /// Callback after opening a new file
     OpenFile(Result<(PathBuf, Arc<String>), anywho::Error>),
-    /// Callback after some action is performed on the text editor
-    Edit(text_editor::Action),
     /// Callback after saving the current file
     FileSaved(Result<PathBuf, anywho::Error>),
     /// Callback after asking to close a file discarding changes
     DiscardChanges(DiscardChangesAction),
+
     /// Deletes the given node entity of the navbar folder or file
     DeleteNode(cosmic::widget::segmented_button::Entity),
     /// Renames the given node entity of the navbar folder or file
@@ -178,6 +178,15 @@ pub enum Message {
     MoveVault,
     /// Callback after asking to move the vault
     VaultMoved(Result<PathBuf, anywho::Error>),
+
+    /// Callback after some action is performed on the text editor
+    Edit(text_editor::Action),
+    /// Apply formatting to selected text
+    ApplyFormatting(utils::SelectionAction),
+    /// Undo requested
+    Undo,
+    /// Redo requested
+    Redo,
 
     /// Update the HTML renderer state
     UpdateMarkState(UpdateMsg),
@@ -191,17 +200,12 @@ pub enum Message {
     PaneDragged(pane_grid::DragEvent),
     /// Scrollable position changed
     ScrollChanged(widget::Id, scrollable::Viewport),
-    /// Apply formatting to selected text
-    ApplyFormatting(utils::SelectionAction),
-    /// Undo requested
-    Undo,
-    /// Redo requested
-    Redo,
-    /// Export current document to PDF
-    ExportPDF,
 
     /// Callback after input on the Config [`ContextPage`]
     ConfigInput(ConfigInput),
+
+    /// Export current document to PDF
+    ExportPDF,
     /// Callback after using asks to close the app
     AppCloseRequested(window::Id),
 }

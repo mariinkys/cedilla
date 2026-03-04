@@ -29,6 +29,7 @@ impl AppModel {
         if let Some(p) = path
             && p.exists()
         {
+            // store parent directory of selected file
             self.selected_nav_path = p.parent().map(|p| p.to_path_buf());
 
             return Task::perform(utils::files::load_file(p), |res| {
@@ -75,6 +76,7 @@ impl AppModel {
     pub fn handle_new_vault_file(&mut self, file_name: String) -> Task<cosmic::Action<Message>> {
         let dir = self.selected_directory();
 
+        // find a name that doesn't already exist
         let file_path = {
             let base = dir.join(format!("{}.md", file_name));
             if !base.exists() {
@@ -91,6 +93,7 @@ impl AppModel {
             }
         };
 
+        // create the file on disk
         if let Err(e) = std::fs::write(&file_path, "") {
             return self.update(Message::AddToast(CedillaToast::new(e)));
         }
@@ -137,10 +140,12 @@ impl AppModel {
             }
         };
 
+        // create the folder on disk
         if let Err(e) = std::fs::create_dir(&folder_path) {
             return self.update(Message::AddToast(CedillaToast::new(e)));
         }
 
+        // insert folder to navbar
         self.insert_folder_node(&folder_path, &dir);
 
         Task::none()
@@ -168,9 +173,12 @@ impl AppModel {
         Task::perform(
             async move {
                 match path {
+                    // We're editing an alreaday existing file
                     Some(path) => Some(utils::files::save_file(path, content).await),
+                    // We want to save a new file
                     None => match utils::files::open_markdown_file_saver(vault_path).await {
                         Some(path) => Some(utils::files::save_file(path.into(), content).await),
+                        // Error selecting where to save the file
                         None => None,
                     },
                 }
@@ -188,6 +196,7 @@ impl AppModel {
     ) -> Task<cosmic::Action<Message>> {
         match result {
             Ok((path, content)) => {
+                // store parent directory of selected file in nav_path only if path is inside vault
                 let vault_path = PathBuf::from(&self.config.vault_path);
                 if path.starts_with(&vault_path) {
                     self.selected_nav_path = path.parent().map(|p| p.to_path_buf());

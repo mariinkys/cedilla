@@ -30,6 +30,7 @@ impl AppModel {
                         Some(path) => {
                             Some(utils::pdf::export_pdf(client, file_path, content, path).await)
                         }
+                        // Error selecting where to save the file
                         None => None,
                     }
                 },
@@ -99,10 +100,16 @@ impl AppModel {
         }
 
         if *is_dirty {
+            // if it's a vault path with any modification or if it's a new file with any content
             if (path.is_some() && history.history_index != 0)
                 || (path.is_none() && !editor_content.text().trim().is_empty())
             {
                 println!("TODO: We're here but for some reason it doesn't work");
+                //self.update(Message::DialogAction(
+                //    dialogs::DialogAction::OpenConfirmCloseFileDialog(
+                //        DiscardChangesAction::CloseApp,
+                //    ),
+                //))
                 process::exit(0);
             } else {
                 process::exit(0);

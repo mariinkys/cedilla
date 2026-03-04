@@ -30,17 +30,21 @@ impl AppModel {
             *is_dirty = true;
             let current_text = editor_content.text();
 
+            // reconstruct the previous text so we can diff against it
             let prev_text = core::history::apply_patch(
                 &history.history_base,
                 &history.history_patches[..history.history_index],
             );
             let patch = core::history::make_patch(&prev_text, &current_text);
 
+            // discard any redo patches above current index
             history.history_patches.truncate(history.history_index);
             history.history_patches.push(patch);
             history.history_index = history.history_patches.len();
 
+            // keep only the last 100 patches; rebase onto the new base
             if history.history_patches.len() > 100 {
+                // advance the base by applying the oldest patch
                 let new_base =
                     core::history::apply_single(&history.history_base, &history.history_patches[0]);
                 history.history_base = new_base;

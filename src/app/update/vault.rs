@@ -32,6 +32,7 @@ impl AppModel {
 
         self.remove_nav_node(&path);
 
+        // if the deleted file was currently open, create a new empty file
         if let State::Ready {
             path: open_path, ..
         } = &self.state
@@ -89,6 +90,7 @@ impl AppModel {
 
         self.rename_nav_node(&old_path, &new_path, &new_name);
 
+        // update the open editor state if the open file was inside the renamed path
         #[allow(clippy::collapsible_if)]
         if let State::Ready {
             path: open_path, ..
@@ -143,6 +145,7 @@ impl AppModel {
         if let Some(target_entity) = target_entity {
             self.move_nav_node(source_entity, target_entity, &dest);
         } else {
+            // target folder was never opened, reload from disk
             let vault_path = PathBuf::from(&self.config.vault_path);
             self.nav_model.clear();
             self.open_vault_folder(&vault_path);
@@ -168,6 +171,7 @@ impl AppModel {
                     Some(path) => {
                         Some(utils::files::move_vault(path.into(), old_vault_path.into()).await)
                     }
+                    // Error selecting where to move the vault
                     None => None,
                 }
             },
@@ -184,6 +188,7 @@ impl AppModel {
     ) -> Task<cosmic::Action<Message>> {
         match result {
             Ok(new_path) => {
+                // update the vault path in the config
                 #[allow(clippy::collapsible_if)]
                 if let Some(handler) = &self.config_handler {
                     if let Err(err) = self
@@ -191,15 +196,18 @@ impl AppModel {
                         .set_vault_path(handler, new_path.to_string_lossy().to_string())
                     {
                         eprintln!("{err}");
+                        // even if it fails we update the config (it won't get saved after restart)
                         let mut old_config = self.config.clone();
                         old_config.vault_path = new_path.to_string_lossy().to_string();
                         self.config = old_config;
                     }
                 }
 
+                // clear the navbar
                 self.core.nav_bar_set_toggled(false);
                 self.nav_model.clear();
 
+                // load vault
                 let vault_path = PathBuf::from(&self.config.vault_path);
                 self.open_vault_folder(&vault_path);
 
