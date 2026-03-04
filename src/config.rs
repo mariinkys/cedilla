@@ -69,6 +69,11 @@ impl CedillaConfig {
         }
     }
 
+    /// Returns the current vault path
+    pub fn vault_path(&self) -> PathBuf {
+        PathBuf::from(&self.vault_path)
+    }
+
     /// Returns true if the Gotenberg URL is not empty
     pub fn is_gotenberg_configured(&self) -> bool {
         !self.gotenberg_url.trim().is_empty()

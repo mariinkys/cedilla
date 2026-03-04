@@ -48,34 +48,34 @@ impl AppModel {
         &mut self,
         action: SelectionAction,
     ) -> Task<cosmic::Action<Message>> {
-        let State::Ready {
-            editor_content,
-            is_dirty,
-            ..
-        } = &mut self.state
-        else {
+        let State::Ready { editor, .. } = &mut self.state else {
             return Task::none();
         };
 
-        let selection = editor_content.selection().unwrap_or_default();
+        let selection = editor.content.selection().unwrap_or_default();
         let formatted = format_selected_text(&selection, action);
         let formatted = formatted.trim_end_matches('\n').to_string();
         let formatted_len = formatted.chars().count();
 
-        editor_content.perform(text_editor::Action::Edit(text_editor::Edit::Paste(
-            Arc::new(formatted),
-        )));
+        editor
+            .content
+            .perform(text_editor::Action::Edit(text_editor::Edit::Paste(
+                Arc::new(formatted),
+            )));
 
         for _ in 0..formatted_len {
-            editor_content.perform(text_editor::Action::Move(text_editor::Motion::Left));
+            editor
+                .content
+                .perform(text_editor::Action::Move(text_editor::Motion::Left));
         }
 
         for _ in 0..formatted_len {
-            editor_content.perform(text_editor::Action::Select(text_editor::Motion::Right));
+            editor
+                .content
+                .perform(text_editor::Action::Select(text_editor::Motion::Right));
         }
 
-        *is_dirty = true;
-        //*items = markdown::parse(editor_content.text().as_ref()).collect();
+        editor.is_dirty = true;
 
         Task::none()
     }

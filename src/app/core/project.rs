@@ -362,7 +362,7 @@ impl AppModel {
     pub fn selected_directory(&self) -> PathBuf {
         self.selected_nav_path
             .clone()
-            .unwrap_or_else(|| PathBuf::from(&self.config.vault_path))
+            .unwrap_or_else(|| self.config.vault_path())
     }
 
     pub fn collect_all_folders(

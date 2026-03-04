@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0
 
-use cosmic::app::context_drawer;
+use cosmic::{Task, app::context_drawer};
 
 use crate::{
     app::{AppModel, Message},
@@ -36,5 +36,18 @@ impl ContextPage {
             )
             .title(fl!("settings")),
         })
+    }
+
+    /// Toggle the current context page
+    pub fn toggle_context_page(&self, state: &mut AppModel) -> Task<cosmic::Action<Message>> {
+        if &state.context_page == self {
+            // Close the context drawer if the toggled context page is the same.
+            state.core.window.show_context = !state.core.window.show_context;
+        } else {
+            // Open the context drawer to display the requested context page.
+            state.context_page = *self;
+            state.core.window.show_context = true;
+        }
+        Task::none()
     }
 }

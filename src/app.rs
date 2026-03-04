@@ -2,7 +2,8 @@
 
 use crate::app::app_menu::MenuAction;
 use crate::app::context_page::ContextPage;
-use crate::app::core::history::HistoryState;
+use crate::app::core::editor::EditorState;
+use crate::app::core::preview::MarkdownPreview;
 use crate::app::core::project::ProjectNode;
 use crate::app::core::utils::{self, CedillaToast, Image};
 use crate::app::dialogs::{DialogPage, DialogState};
@@ -13,19 +14,17 @@ use cosmic::app::context_drawer;
 use cosmic::iced::{Alignment, Event, Length, Padding, Subscription, highlighter, window};
 use cosmic::iced_core::keyboard::{Key, Modifiers};
 use cosmic::iced_widget::{center, column, row, scrollable, tooltip};
-use cosmic::widget::menu::Action;
 use cosmic::widget::space::horizontal;
 use cosmic::widget::{self, about::About, menu};
 use cosmic::widget::{
-    ToastId, Toasts, button, container, image, nav_bar, pane_grid, responsive, segmented_button,
-    svg, text, text_input, toaster,
+    ToastId, Toasts, button, container, nav_bar, pane_grid, responsive, segmented_button, text,
+    text_input, toaster,
 };
 use cosmic::{prelude::*, surface, theme};
-use frostmark::{MarkState, MarkWidget, UpdateMsg};
+use frostmark::{MarkWidget, UpdateMsg};
 use slotmap::Key as SlotMapKey;
-use std::collections::{HashMap, HashSet, VecDeque};
+use std::collections::{HashMap, VecDeque};
 use std::path::{Path, PathBuf};
-use std::process;
 use std::sync::Arc;
 use widgets::{TextEditor, text_editor};
 
@@ -33,6 +32,7 @@ pub mod app_menu;
 mod context_page;
 mod core;
 mod dialogs;
+mod update;
 
 const REPOSITORY: &str = env!("CARGO_PKG_REPOSITORY");
 
@@ -78,26 +78,14 @@ pub struct AppModel {
 enum State {
     Loading,
     Ready {
-        /// Current if/any file path
-        path: Option<PathBuf>,
-        /// Text Editor Content
-        editor_content: text_editor::Content,
-        /// Markdown Preview state
-        markstate: MarkState,
-        /// Images in the Markdown preview
-        images: HashMap<String, image::Handle>,
-        /// SVGs in the Markdown preview
-        svgs: HashMap<String, svg::Handle>,
-        /// Keep track of images in progress/downloading
-        images_in_progress: HashSet<String>,
-        /// Track if any changes have been made to the current file
-        is_dirty: bool,
+        /// Holds the state for editor related fields
+        editor: EditorState,
+        /// Holds the state for preview related fields
+        preview: MarkdownPreview,
         /// Pane grid state
         panes: pane_grid::State<PaneContent>,
         /// Controls if the preview is hidden or not
         preview_state: PreviewState,
-        /// Allows us to undo and redo
-        history: HistoryState,
     },
 }
 
@@ -135,17 +123,18 @@ pub enum Message {
     ToggleContextPage(ContextPage),
     /// Update the application config
     UpdateConfig(CedillaConfig),
-    /// Callback after clicking something in the app menu
-    MenuAction(app_menu::MenuAction),
     /// Needed for responsive menu bar
     Surface(surface::Action),
     /// Executes the appropiate cosmic binding on keyboard shortcut
     Key(Modifiers, Key),
     /// Updates the current state of keyboard modifiers
     Modifiers(Modifiers),
+
+    /// Callback after clicking something in the app menu
+    MenuAction(app_menu::MenuAction),
+
     /// Asks to execute various actions related to the application dialogs
     DialogAction(dialogs::DialogAction),
-
     /// Right click on a NavBar Item
     NavBarContext(segmented_button::Entity),
     /// Fired when a menu item is chosen
@@ -163,12 +152,11 @@ pub enum Message {
     SaveFile,
     /// Callback after opening a new file
     OpenFile(Result<(PathBuf, Arc<String>), anywho::Error>),
-    /// Callback after some action is performed on the text editor
-    Edit(text_editor::Action),
     /// Callback after saving the current file
     FileSaved(Result<PathBuf, anywho::Error>),
     /// Callback after asking to close a file discarding changes
     DiscardChanges(DiscardChangesAction),
+
     /// Deletes the given node entity of the navbar folder or file
     DeleteNode(cosmic::widget::segmented_button::Entity),
     /// Renames the given node entity of the navbar folder or file
@@ -179,6 +167,15 @@ pub enum Message {
     MoveVault,
     /// Callback after asking to move the vault
     VaultMoved(Result<PathBuf, anywho::Error>),
+
+    /// Callback after some action is performed on the text editor
+    Edit(text_editor::Action),
+    /// Apply formatting to selected text
+    ApplyFormatting(utils::SelectionAction),
+    /// Undo requested
+    Undo,
+    /// Redo requested
+    Redo,
 
     /// Update the HTML renderer state
     UpdateMarkState(UpdateMsg),
@@ -192,17 +189,12 @@ pub enum Message {
     PaneDragged(pane_grid::DragEvent),
     /// Scrollable position changed
     ScrollChanged(widget::Id, scrollable::Viewport),
-    /// Apply formatting to selected text
-    ApplyFormatting(utils::SelectionAction),
-    /// Undo requested
-    Undo,
-    /// Redo requested
-    Redo,
-    /// Export current document to PDF
-    ExportPDF,
 
     /// Callback after input on the Config [`ContextPage`]
     ConfigInput(ConfigInput),
+
+    /// Export current document to PDF
+    ExportPDF,
     /// Callback after using asks to close the app
     AppCloseRequested(window::Id),
 }
@@ -416,46 +408,26 @@ impl cosmic::Application for AppModel {
             return Some(vec![]);
         }
 
-        let node = self.nav_model.data::<ProjectNode>(entity)?;
+        // no need to use this for now as we don't have different context menu options for files and folders
+        //let node = self.nav_model.data::<ProjectNode>(entity)?;
 
         let mut items = Vec::with_capacity(1);
 
-        match node {
-            ProjectNode::File { .. } => {
-                items.push(cosmic::widget::menu::Item::Button(
-                    fl!("delete"),
-                    None,
-                    NavMenuAction::DeleteNode(entity),
-                ));
-                items.push(cosmic::widget::menu::Item::Button(
-                    fl!("rename"),
-                    None,
-                    NavMenuAction::RenameNode(entity),
-                ));
-                items.push(cosmic::widget::menu::Item::Button(
-                    fl!("move-to"),
-                    None,
-                    NavMenuAction::MoveNode(entity),
-                ));
-            }
-            ProjectNode::Folder { .. } => {
-                items.push(cosmic::widget::menu::Item::Button(
-                    fl!("delete"),
-                    None,
-                    NavMenuAction::DeleteNode(entity),
-                ));
-                items.push(cosmic::widget::menu::Item::Button(
-                    fl!("rename"),
-                    None,
-                    NavMenuAction::RenameNode(entity),
-                ));
-                items.push(cosmic::widget::menu::Item::Button(
-                    fl!("move-to"),
-                    None,
-                    NavMenuAction::MoveNode(entity),
-                ));
-            }
-        }
+        items.push(cosmic::widget::menu::Item::Button(
+            fl!("delete"),
+            None,
+            NavMenuAction::DeleteNode(entity),
+        ));
+        items.push(cosmic::widget::menu::Item::Button(
+            fl!("rename"),
+            None,
+            NavMenuAction::RenameNode(entity),
+        ));
+        items.push(cosmic::widget::menu::Item::Button(
+            fl!("move-to"),
+            None,
+            NavMenuAction::MoveNode(entity),
+        ));
 
         Some(cosmic::widget::menu::items(
             &std::collections::HashMap::new(),
@@ -464,17 +436,9 @@ impl cosmic::Application for AppModel {
     }
 
     fn on_nav_select(&mut self, id: nav_bar::Id) -> Task<cosmic::Action<Message>> {
-        let State::Ready {
-            editor_content,
-            is_dirty,
-            history,
-            path,
-            ..
-        } = &self.state
-        else {
+        let State::Ready { editor, .. } = &self.state else {
             return Task::none();
         };
-        let old_path = path;
 
         let node_opt = match self.nav_model.data_mut::<ProjectNode>(id) {
             Some(node) => {
@@ -517,10 +481,8 @@ impl cosmic::Application for AppModel {
                         //store parent directory of selected file
                         //self.selected_nav_path = path.parent().map(|p| p.to_path_buf());
 
-                        if *is_dirty {
-                            if (old_path.is_some() && history.history_index != 0)
-                                || (old_path.is_none() && !editor_content.text().trim().is_empty())
-                            {
+                        if editor.is_dirty {
+                            if editor.needs_confirmation() {
                                 Task::done(cosmic::action::app(Message::DialogAction(
                                     dialogs::DialogAction::OpenConfirmCloseFileDialog(
                                         DiscardChangesAction::OpenFile(path),
@@ -566,26 +528,12 @@ impl cosmic::Application for AppModel {
         let content: Element<_> = match &self.state {
             State::Loading => center(text(fl!("loading"))).into(),
             State::Ready {
-                path,
-                editor_content,
-                markstate,
-                images,
-                svgs,
-                is_dirty,
+                editor,
+                preview,
                 panes,
                 preview_state,
                 ..
-            } => cedilla_main_view(
-                &self.config,
-                path,
-                editor_content,
-                markstate,
-                images,
-                svgs,
-                is_dirty,
-                panes,
-                preview_state,
-            ),
+            } => cedilla_main_view(&self.config, editor, preview, panes, preview_state),
         };
 
         toaster(&self.toasts, container(content).center(Length::Fill))
@@ -640,949 +588,61 @@ impl cosmic::Application for AppModel {
     /// on the application's async runtime.
     fn update(&mut self, message: Self::Message) -> Task<cosmic::Action<Self::Message>> {
         match message {
-            Message::CloseToast(id) => {
-                self.toasts.remove(id);
-                Task::none()
-            }
-            Message::AddToast(toast) => self.toasts.push(toast.into()).map(cosmic::action::app),
-            Message::ToggleContextPage(context_page) => {
-                if self.context_page == context_page {
-                    // Close the context drawer if the toggled context page is the same.
-                    self.core.window.show_context = !self.core.window.show_context;
-                } else {
-                    // Open the context drawer to display the requested context page.
-                    self.context_page = context_page;
-                    self.core.window.show_context = true;
-                }
-                Task::none()
-            }
-            Message::UpdateConfig(config) => {
-                self.config = config;
-                Task::none()
-            }
-            Message::LaunchUrl(url) => match open::that_detached(&url) {
-                Ok(()) => Task::none(),
-                Err(err) => {
-                    eprintln!("failed to open {url:?}: {err}");
-                    Task::none()
-                }
-            },
-            Message::MenuAction(action) => {
-                let State::Ready { preview_state, .. } = &mut self.state else {
-                    return Task::none();
-                };
-
-                match action {
-                    MenuAction::About => {
-                        self.update(Message::ToggleContextPage(ContextPage::About))
-                    }
-                    MenuAction::Settings => {
-                        self.update(Message::ToggleContextPage(ContextPage::Settings))
-                    }
-                    MenuAction::OpenFile => Task::perform(
-                        async move {
-                            match utils::files::open_markdown_file_picker().await {
-                                Some(path) => Some(utils::files::load_file(path.into()).await),
-                                None => None,
-                            }
-                        },
-                        |res| match res {
-                            Some(result) => cosmic::action::app(Message::OpenFile(result)),
-                            None => cosmic::action::none(),
-                        },
-                    ),
-                    MenuAction::NewFile => self.update(Message::NewFile),
-                    MenuAction::NewVaultFile => self.update(Message::DialogAction(
-                        dialogs::DialogAction::OpenNewVaultFileDialog,
-                    )),
-                    MenuAction::NewVaultFolder => self.update(Message::DialogAction(
-                        dialogs::DialogAction::OpenNewVaultFolderDialog,
-                    )),
-                    MenuAction::SaveFile => self.update(Message::SaveFile),
-                    MenuAction::TogglePreview => {
-                        match preview_state {
-                            PreviewState::Hidden => *preview_state = PreviewState::Shown,
-                            PreviewState::Shown => *preview_state = PreviewState::Hidden,
-                        }
-
-                        Task::none()
-                    }
-                    MenuAction::Undo => self.update(Message::Undo),
-                    MenuAction::Redo => self.update(Message::Redo),
-                }
-            }
-            Message::Surface(a) => {
-                cosmic::task::message(cosmic::Action::Cosmic(cosmic::app::Action::Surface(a)))
-            }
-            Message::Key(modifiers, key) => {
-                for (key_bind, action) in self.key_binds.iter() {
-                    if key_bind.matches(modifiers, &key) {
-                        return self.update(action.message());
-                    }
-                }
-                Task::none()
-            }
-            Message::Modifiers(modifiers) => {
-                self.modifiers = modifiers;
-                Task::none()
-            }
-            Message::DialogAction(action) => {
-                let State::Ready { .. } = &mut self.state else {
-                    return Task::none();
-                };
-
-                action.execute(&mut self.dialog_pages, &self.dialog_state)
-            }
-
-            Message::NavBarContext(entity) => {
-                self.nav_bar_context_id = entity;
-                Task::none()
-            }
-            Message::NavMenuAction(action) => {
-                self.nav_bar_context_id = segmented_button::Entity::null();
-                match action {
-                    NavMenuAction::DeleteNode(entity) => self.update(Message::DialogAction(
-                        dialogs::DialogAction::OpenDeleteNodeDialog(entity),
-                    )),
-                    NavMenuAction::RenameNode(entity) => self.update(Message::DialogAction(
-                        dialogs::DialogAction::OpenRenameNodeDialog(entity),
-                    )),
-                    NavMenuAction::MoveNode(entity) => {
-                        let vault_path = PathBuf::from(&self.config.vault_path);
-                        self.dialog_state.available_folders =
-                            self.collect_all_folders(&vault_path, entity);
-
-                        self.update(Message::DialogAction(
-                            dialogs::DialogAction::OpenMoveNodeDialog(entity),
-                        ))
-                    }
-                }
-            }
-
-            Message::Startup => {
-                // Create initial pane configuration with editor on left, preview on right
-                let (mut panes, first_pane) = pane_grid::State::new(PaneContent::Editor);
-                panes.split(pane_grid::Axis::Vertical, first_pane, PaneContent::Preview);
-
-                let preview_state = match self.config.last_preview_showstate {
-                    ShowState::Show => PreviewState::Shown,
-                    ShowState::Hide => PreviewState::Hidden,
-                };
-
-                let path = match self.config.open_last_file {
-                    crate::config::BoolState::Yes => self.config.last_open_file.clone(),
-                    crate::config::BoolState::No => None,
-                };
-
-                if let Some(p) = path
-                    && p.exists()
-                {
-                    // store parent directory of selected file
-                    self.selected_nav_path = p.parent().map(|p| p.to_path_buf());
-
-                    return Task::perform(utils::files::load_file(p), |res| {
-                        cosmic::action::app(Message::OpenFile(res))
-                    })
-                    .chain(Task::done(cosmic::action::app(
-                        Message::SetPreviewState(preview_state),
-                    )));
-                }
-
-                // same as new file but we preserve the preview state
-                self.state = State::Ready {
-                    path: None,
-                    editor_content: text_editor::Content::new(),
-                    markstate: MarkState::with_html_and_markdown(""),
-                    images: HashMap::new(),
-                    svgs: HashMap::new(),
-                    images_in_progress: HashSet::new(),
-                    is_dirty: true,
-                    panes,
-                    preview_state,
-                    history: HistoryState::default(),
-                };
-                Task::none()
-            }
-            Message::NewFile => {
-                // Create initial pane configuration with editor on left, preview on right
-                let (mut panes, first_pane) = pane_grid::State::new(PaneContent::Editor);
-                panes.split(pane_grid::Axis::Vertical, first_pane, PaneContent::Preview);
-
-                self.state = State::Ready {
-                    path: None,
-                    editor_content: text_editor::Content::new(),
-                    markstate: MarkState::with_html_and_markdown(""),
-                    images: HashMap::new(),
-                    svgs: HashMap::new(),
-                    images_in_progress: HashSet::new(),
-                    is_dirty: true,
-                    panes,
-                    preview_state: PreviewState::Shown,
-                    history: HistoryState::default(),
-                };
-                Task::none()
-            }
-            Message::NewVaultFile(file_name) => {
-                let dir = self.selected_directory();
-
-                // find a name that doesn't already exist
-                let file_path = {
-                    let base = dir.join(format!("{}.md", file_name));
-                    if !base.exists() {
-                        base
-                    } else {
-                        let mut i = 1;
-                        loop {
-                            let candidate = dir.join(format!("{}-{}.md", file_name, i));
-                            if !candidate.exists() {
-                                break candidate;
-                            }
-                            i += 1;
-                        }
-                    }
-                };
-
-                // create the file on disk
-                if let Err(e) = std::fs::write(&file_path, "") {
-                    return self.update(Message::AddToast(CedillaToast::new(e)));
-                }
-
-                // insert file to navbar
-                self.insert_file_node(&file_path, &dir);
-
-                // Create initial pane configuration with editor on left, preview on right
-                let (mut panes, first_pane) = pane_grid::State::new(PaneContent::Editor);
-                panes.split(pane_grid::Axis::Vertical, first_pane, PaneContent::Preview);
-
-                self.state = State::Ready {
-                    path: Some(file_path),
-                    editor_content: text_editor::Content::new(),
-                    markstate: MarkState::with_html_and_markdown(""),
-                    images: HashMap::new(),
-                    svgs: HashMap::new(),
-                    images_in_progress: HashSet::new(),
-                    is_dirty: true,
-                    panes,
-                    preview_state: PreviewState::Shown,
-                    history: HistoryState::default(),
-                };
-
-                Task::none()
-            }
-            Message::NewVaultFolder(folder_name) => {
-                let dir = self.selected_directory();
-
-                let folder_path = {
-                    let base = dir.join(&folder_name);
-                    if !base.exists() {
-                        base
-                    } else {
-                        let mut i = 1;
-                        loop {
-                            let candidate = dir.join(format!("{}-{}", folder_name, i));
-                            if !candidate.exists() {
-                                break candidate;
-                            }
-                            i += 1;
-                        }
-                    }
-                };
-
-                // create the file on disk
-                if let Err(e) = std::fs::create_dir(&folder_path) {
-                    return self.update(Message::AddToast(CedillaToast::new(e)));
-                }
-
-                // insert folder to navbar
-                self.insert_folder_node(&folder_path, &dir);
-
-                Task::none()
-            }
-            Message::SaveFile => {
-                let State::Ready {
-                    editor_content,
-                    path,
-                    is_dirty,
-                    ..
-                } = &mut self.state
-                else {
-                    return Task::none();
-                };
-
-                if !*is_dirty {
-                    return Task::none();
-                }
-
-                let content = editor_content.text();
-                let path = path.clone();
-                let vault_path = self.config.vault_path.clone();
-
-                Task::perform(
-                    async move {
-                        match path {
-                            // We're editing an alreaday existing file
-                            Some(path) => Some(utils::files::save_file(path, content).await),
-                            // We want to save a new file
-                            None => {
-                                match utils::files::open_markdown_file_saver(vault_path).await {
-                                    Some(path) => {
-                                        Some(utils::files::save_file(path.into(), content).await)
-                                    }
-                                    // Error selecting where to save the file
-                                    None => None,
-                                }
-                            }
-                        }
-                    },
-                    |res| match res {
-                        Some(result) => cosmic::action::app(Message::FileSaved(result)),
-                        None => cosmic::action::none(),
-                    },
-                )
-            }
-            Message::OpenFile(result) => match result {
-                Ok((path, content)) => {
-                    // store parent directory of selected file in nav_path only if path is inside vault
-                    let vault_path = PathBuf::from(&self.config.vault_path);
-                    if path.starts_with(&vault_path) {
-                        self.selected_nav_path = path.parent().map(|p| p.to_path_buf());
-                    }
-
-                    // Create initial pane configuration (TODO: Move this to a helper func (also used in NewFile))
-                    let (mut panes, first_pane) = pane_grid::State::new(PaneContent::Editor);
-                    panes.split(pane_grid::Axis::Vertical, first_pane, PaneContent::Preview);
-
-                    let markstate = MarkState::with_html_and_markdown(content.as_ref());
-                    let images_in_progress = HashSet::new();
-
-                    self.state = State::Ready {
-                        path: Some(path),
-                        editor_content: text_editor::Content::with_text(content.as_ref()),
-                        markstate,
-                        images: HashMap::new(),
-                        svgs: HashMap::new(),
-                        images_in_progress,
-                        is_dirty: false,
-                        panes,
-                        preview_state: PreviewState::Shown,
-                        history: HistoryState::new_with_content(content.to_string()),
-                    };
-
-                    if let State::Ready {
-                        markstate,
-                        images_in_progress,
-                        path,
-                        ..
-                    } = &mut self.state
-                    {
-                        return utils::images::download_images(markstate, images_in_progress, path);
-                    }
-
-                    Task::none()
-                }
-                Err(e) => self.update(Message::AddToast(CedillaToast::new(e))),
-            },
-            Message::Edit(action) => {
-                let State::Ready {
-                    path,
-                    editor_content,
-                    is_dirty,
-                    markstate,
-                    images_in_progress,
-                    history,
-                    ..
-                } = &mut self.state
-                else {
-                    return Task::none();
-                };
-
-                let was_edit = action.is_edit();
-                editor_content.perform(action);
-                *markstate = MarkState::with_html_and_markdown(editor_content.text().as_ref());
-
-                if was_edit {
-                    *is_dirty = true;
-                    let current_text = editor_content.text();
-
-                    // reconstruct the previous text so we can diff against it
-                    let prev_text = core::history::apply_patch(
-                        &history.history_base,
-                        &history.history_patches[..history.history_index],
-                    );
-                    let patch = core::history::make_patch(&prev_text, &current_text);
-
-                    // discard any redo patches above current index
-                    history.history_patches.truncate(history.history_index);
-                    history.history_patches.push(patch);
-                    history.history_index = history.history_patches.len();
-
-                    // keep only the last 100 patches; rebase onto the new base
-                    if history.history_patches.len() > 100 {
-                        // advance the base by applying the oldest patch
-                        let new_base = core::history::apply_single(
-                            &history.history_base,
-                            &history.history_patches[0],
-                        );
-                        history.history_base = new_base;
-                        history.history_patches.remove(0);
-                        history.history_index = history.history_patches.len();
-                    }
-                }
-
-                utils::images::download_images(markstate, images_in_progress, path)
-            }
-            Message::FileSaved(result) => match result {
-                Ok(new_path) => {
-                    let State::Ready { path, is_dirty, .. } = &mut self.state else {
-                        return Task::none();
-                    };
-
-                    *path = Some(new_path);
-                    *is_dirty = false;
-
-                    self.update(Message::AddToast(CedillaToast::new("File Saved!")))
-                }
-                Err(e) => self.update(Message::AddToast(CedillaToast::new(e))),
-            },
-            Message::DiscardChanges(action) => match action {
-                DiscardChangesAction::CloseApp => {
-                    process::exit(0);
-                }
-                DiscardChangesAction::OpenFile(path) => {
-                    Task::perform(utils::files::load_file(path), |res| {
-                        cosmic::action::app(Message::OpenFile(res))
-                    })
-                }
-            },
-            Message::DeleteNode(entity) => {
-                let Some(node) = self.nav_model.data::<ProjectNode>(entity).cloned() else {
-                    return Task::none();
-                };
-
-                let path = match &node {
-                    ProjectNode::File { path, .. } => path.clone(),
-                    ProjectNode::Folder { path, .. } => path.clone(),
-                };
-
-                let delete_result = match &node {
-                    ProjectNode::File { .. } => std::fs::remove_file(&path),
-                    ProjectNode::Folder { .. } => std::fs::remove_dir_all(&path),
-                };
-
-                if let Err(e) = delete_result {
-                    return self.update(Message::AddToast(CedillaToast::new(e)));
-                }
-
-                // remove from nav model
-                self.remove_nav_node(&path);
-
-                // if the deleted file was currently open, create a new empty file
-                if let State::Ready {
-                    path: open_path, ..
-                } = &self.state
-                    && open_path.as_deref() == Some(&path)
-                {
-                    return self.update(Message::NewFile);
-                }
-
-                Task::none()
-            }
-            Message::RenameNode(entity, new_name) => {
-                let Some(node) = self.nav_model.data::<ProjectNode>(entity).cloned() else {
-                    return Task::none();
-                };
-
-                let old_path = match &node {
-                    ProjectNode::File { path, .. } | ProjectNode::Folder { path, .. } => {
-                        path.clone()
-                    }
-                };
-
-                let new_name = match &node {
-                    ProjectNode::File { .. } => {
-                        if new_name.ends_with(".md") {
-                            new_name
-                        } else {
-                            format!("{}.md", new_name)
-                        }
-                    }
-                    ProjectNode::Folder { .. } => new_name,
-                };
-
-                let new_path = match old_path.parent() {
-                    Some(parent) => parent.join(&new_name),
-                    None => return Task::none(),
-                };
-
-                if new_path == old_path {
-                    return Task::none();
-                }
-
-                if new_path.exists() {
-                    return self.update(Message::AddToast(CedillaToast::new(format!(
-                        "A file or folder named {:?} already exists",
-                        new_name
-                    ))));
-                }
-
-                if let Err(e) = std::fs::rename(&old_path, &new_path) {
-                    return self.update(Message::AddToast(CedillaToast::new(e)));
-                }
-
-                self.rename_nav_node(&old_path, &new_path, &new_name);
-
-                // update the open editor state if the open file was inside the renamed path
-                #[allow(clippy::collapsible_if)]
-                if let State::Ready {
-                    path: open_path, ..
-                } = &mut self.state
-                {
-                    if let Some(current) = open_path.as_deref() {
-                        if current.starts_with(&old_path) {
-                            let suffix = current.strip_prefix(&old_path).unwrap().to_path_buf();
-                            *open_path = Some(if suffix == std::path::Path::new("") {
-                                new_path.clone()
-                            } else {
-                                new_path.join(suffix)
-                            });
-                        }
-                    }
-                }
-                Task::none()
-            }
-            Message::MoveNode(source_entity, target_path) => {
-                let source_path = match self.nav_model.data::<ProjectNode>(source_entity) {
-                    Some(ProjectNode::File { path, .. } | ProjectNode::Folder { path, .. }) => {
-                        path.clone()
-                    }
-                    None => return Task::none(),
-                };
-
-                let file_name = match source_path.file_name() {
-                    Some(n) => n,
-                    None => return Task::none(),
-                };
-                let dest = target_path.join(file_name);
-
-                if source_path == target_path || dest == source_path {
-                    return Task::none();
-                }
-
-                if let Err(e) = std::fs::rename(&source_path, &dest) {
-                    return self.update(Message::AddToast(CedillaToast::new(e)));
-                }
-
-                let target_entity = self.nav_model.iter().find(|&id| {
-                    matches!(
-                        self.nav_model.data::<ProjectNode>(id),
-                        Some(ProjectNode::Folder { path, .. }) if *path == target_path
-                    )
-                });
-
-                if let Some(target_entity) = target_entity {
-                    self.move_nav_node(source_entity, target_entity, &dest);
-                } else {
-                    // target folder was never opened, reload from disk
-                    let vault_path = PathBuf::from(&self.config.vault_path);
-                    self.nav_model.clear();
-                    self.open_vault_folder(&vault_path);
-                }
-
-                if let State::Ready {
-                    path: open_path, ..
-                } = &mut self.state
-                    && open_path.as_deref() == Some(&source_path)
-                {
-                    *open_path = Some(dest);
-                }
-
-                Task::none()
-            }
-            Message::MoveVault => {
-                let old_vault_path = self.config.vault_path.clone();
-
-                Task::perform(
-                    async move {
-                        match utils::files::open_folder_picker(old_vault_path.clone()).await {
-                            Some(path) => Some(
-                                utils::files::move_vault(path.into(), old_vault_path.into()).await,
-                            ),
-                            // Error selecting where to move the vault
-                            None => None,
-                        }
-                    },
-                    |res| match res {
-                        Some(result) => cosmic::action::app(Message::VaultMoved(result)),
-                        None => cosmic::action::none(),
-                    },
-                )
-            }
-            Message::VaultMoved(result) => {
-                match result {
-                    Ok(new_path) => {
-                        // update the vault path in the config
-                        #[allow(clippy::collapsible_if)]
-                        if let Some(handler) = &self.config_handler {
-                            if let Err(err) = self
-                                .config
-                                .set_vault_path(handler, new_path.to_string_lossy().to_string())
-                            {
-                                eprintln!("{err}");
-                                // even if it fails we update the config (it won't get saved after restart)
-                                let mut old_config = self.config.clone();
-                                old_config.vault_path = new_path.to_string_lossy().to_string();
-                                self.config = old_config;
-                            }
-                        }
-
-                        // clear the navbar
-                        self.core.nav_bar_set_toggled(false);
-                        self.nav_model.clear();
-
-                        // load vault
-                        let vault_path = PathBuf::from(&self.config.vault_path);
-                        self.open_vault_folder(&vault_path);
-
-                        Task::done(cosmic::action::app(Message::NewFile))
-                    }
-                    Err(e) => self.update(Message::AddToast(CedillaToast::new(e))),
-                }
-            }
-
-            Message::UpdateMarkState(message) => {
-                if let State::Ready { markstate, .. } = &mut self.state {
-                    markstate.update(message)
-                }
-                Task::none()
-            }
-            Message::ImageDownloaded(res) => {
-                let State::Ready { images, svgs, .. } = &mut self.state else {
-                    return Task::none();
-                };
-
-                match res {
-                    Ok(image) => {
-                        if image.is_svg {
-                            svgs.insert(image.url, svg::Handle::from_memory(image.bytes));
-                        } else {
-                            images.insert(image.url, image::Handle::from_bytes(image.bytes));
-                        }
-                    }
-                    Err(err) => {
-                        eprintln!("Couldn't download image: {err}");
-                    }
-                }
-
-                Task::none()
-            }
-            Message::SetPreviewState(desired_state) => {
-                let State::Ready { preview_state, .. } = &mut self.state else {
-                    return Task::none();
-                };
-
-                *preview_state = desired_state;
-
-                Task::none()
-            }
-            Message::PaneResized(event) => {
-                let State::Ready { panes, .. } = &mut self.state else {
-                    return Task::none();
-                };
-
-                panes.resize(event.split, event.ratio);
-                Task::none()
-            }
-            Message::PaneDragged(pane_grid::DragEvent::Dropped { pane, target }) => {
-                let State::Ready { panes, .. } = &mut self.state else {
-                    return Task::none();
-                };
-
-                panes.drop(pane, target);
-                Task::none()
-            }
-            Message::PaneDragged(_) => Task::none(),
-            Message::ScrollChanged(source_id, viewport) => {
-                let State::Ready { .. } = &mut self.state else {
-                    return Task::none();
-                };
-
-                if self.config.scrollbar_sync != BoolState::Yes {
-                    return Task::none();
-                }
-
-                let offset = viewport.absolute_offset();
-
-                let target_id = if source_id == editor_scrollable_id() {
-                    preview_scrollable_id()
-                } else {
-                    editor_scrollable_id()
-                };
-
-                scrollable::scroll_to(target_id, offset.into()).map(cosmic::action::app)
-            }
-
-            Message::ApplyFormatting(action) => self.apply_formatting_to_selection(action),
-            Message::Undo => {
-                let State::Ready {
-                    path,
-                    editor_content,
-                    markstate,
-                    images_in_progress,
-                    is_dirty,
-                    history,
-                    ..
-                } = &mut self.state
-                else {
-                    return Task::none();
-                };
-
-                if history.history_index > 0 {
-                    history.history_index -= 1;
-                    let snapshot = core::history::apply_patch(
-                        &history.history_base,
-                        &history.history_patches[..history.history_index],
-                    );
-                    *editor_content = text_editor::Content::with_text(&snapshot);
-                    *markstate = MarkState::with_html_and_markdown(&snapshot);
-                    *is_dirty =
-                        history.history_index != 0 || !history.history_base.trim().is_empty();
-                }
-
-                utils::images::download_images(markstate, images_in_progress, path)
-            }
-            Message::Redo => {
-                let State::Ready {
-                    path,
-                    editor_content,
-                    markstate,
-                    images_in_progress,
-                    history,
-                    ..
-                } = &mut self.state
-                else {
-                    return Task::none();
-                };
-
-                if history.history_index < history.history_patches.len() {
-                    history.history_index += 1;
-                    let snapshot = core::history::apply_patch(
-                        &history.history_base,
-                        &history.history_patches[..history.history_index],
-                    );
-                    *editor_content = text_editor::Content::with_text(&snapshot);
-                    *markstate = MarkState::with_html_and_markdown(&snapshot);
-                }
-
-                utils::images::download_images(markstate, images_in_progress, path)
-            }
-            Message::ExportPDF => {
-                let State::Ready {
-                    editor_content,
-                    path,
-                    ..
-                } = &mut self.state
-                else {
-                    return Task::none();
-                };
-
-                let content = editor_content.text();
-
-                if self.config.is_gotenberg_configured() && !content.trim().is_empty() {
-                    let client = self.gotenberg_client.clone();
-                    let file_path = path.clone();
-
-                    Task::perform(
-                        async move {
-                            match utils::files::open_pdf_file_saver().await {
-                                Some(path) => Some(
-                                    utils::pdf::export_pdf(client, file_path, content, path).await,
-                                ),
-                                // Error selecting where to save the file
-                                None => None,
-                            }
-                        },
-                        |res| match res {
-                            Some(result) => match result {
-                                Ok(_) => cosmic::action::app(Message::AddToast(CedillaToast::new(
-                                    "Exported Correctly",
-                                ))),
-                                Err(e) => {
-                                    cosmic::action::app(Message::AddToast(CedillaToast::new(e)))
-                                }
-                            },
-                            None => cosmic::action::none(),
-                        },
-                    )
-                } else {
-                    Task::none()
-                }
-            }
-
-            #[allow(clippy::collapsible_if)]
-            Message::ConfigInput(input) => match input {
-                ConfigInput::UpdateTheme(index) => {
-                    let app_theme = match index {
-                        1 => AppTheme::Dark,
-                        2 => AppTheme::Light,
-                        _ => AppTheme::System,
-                    };
-
-                    if let Some(handler) = &self.config_handler {
-                        if let Err(err) = self.config.set_app_theme(handler, app_theme) {
-                            eprintln!("{err}");
-                            // even if it fails we update the config (it won't get saved after restart)
-                            let mut old_config = self.config.clone();
-                            old_config.app_theme = app_theme;
-                            self.config = old_config;
-                        }
-
-                        return cosmic::command::set_theme(self.config.app_theme.theme());
-                    }
-                    Task::none()
-                }
-                ConfigInput::HelperHeaderBarShowState(show_state) => {
-                    if let Some(handler) = &self.config_handler {
-                        if let Err(err) =
-                            self.config.set_show_helper_header_bar(handler, show_state)
-                        {
-                            eprintln!("{err}");
-                            // even if it fails we update the config (it won't get saved after restart)
-                            let mut old_config = self.config.clone();
-                            old_config.show_helper_header_bar = show_state;
-                            self.config = old_config;
-                        }
-                    }
-                    Task::none()
-                }
-                ConfigInput::StatusBarShowState(show_state) => {
-                    if let Some(handler) = &self.config_handler {
-                        if let Err(err) = self.config.set_show_status_bar(handler, show_state) {
-                            eprintln!("{err}");
-                            // even if it fails we update the config (it won't get saved after restart)
-                            let mut old_config = self.config.clone();
-                            old_config.show_status_bar = show_state;
-                            self.config = old_config;
-                        }
-                    }
-                    Task::none()
-                }
-                ConfigInput::OpenLastFile(state) => {
-                    if let Some(handler) = &self.config_handler {
-                        if let Err(err) = self.config.set_open_last_file(handler, state) {
-                            eprintln!("{err}");
-                            // even if it fails we update the config (it won't get saved after restart)
-                            let mut old_config = self.config.clone();
-                            old_config.open_last_file = state;
-                            self.config = old_config;
-                        }
-                    }
-                    Task::none()
-                }
-                ConfigInput::ScrollbarSync(state) => {
-                    if let Some(handler) = &self.config_handler {
-                        if let Err(err) = self.config.set_scrollbar_sync(handler, state) {
-                            eprintln!("{err}");
-                            // even if it fails we update the config (it won't get saved after restart)
-                            let mut old_config = self.config.clone();
-                            old_config.scrollbar_sync = state;
-                            self.config = old_config;
-                        }
-                    }
-                    Task::none()
-                }
-                ConfigInput::GotenbergUrlInput(state) => {
-                    if let Some(handler) = &self.config_handler {
-                        if let Err(err) = self.config.set_gotenberg_url(handler, state) {
-                            eprintln!("{err}");
-                        }
-                    }
-                    Task::none()
-                }
-                ConfigInput::GotenbergUrlSave => {
-                    // rebuild the gotenberg client
-                    self.gotenberg_client = gotenberg_pdf::Client::new(&self.config.gotenberg_url);
-
-                    Task::none()
-                }
-                ConfigInput::UpdateTextSize(new_size) => {
-                    let size = new_size as i32;
-                    if let Some(handler) = &self.config_handler {
-                        if let Err(err) = self.config.set_text_size(handler, size) {
-                            eprintln!("{err}");
-                            // even if it fails we update the config (it won't get saved after restart)
-                            let mut old_config = self.config.clone();
-                            old_config.text_size = size;
-                            self.config = old_config;
-                        }
-                    }
-                    Task::none()
-                }
-            },
-            Message::AppCloseRequested(window_id) => {
-                let State::Ready {
-                    editor_content,
-                    is_dirty,
-                    history,
-                    preview_state,
-                    path,
-                    ..
-                } = &self.state
-                else {
-                    return Task::none();
-                };
-
-                if Some(window_id) != self.core.main_window_id() {
-                    return Task::none();
-                }
-
-                if let Some(handler) = &self.config_handler {
-                    let current_preview_state = match preview_state {
-                        PreviewState::Hidden => ShowState::Hide,
-                        PreviewState::Shown => ShowState::Show,
-                    };
-
-                    let current_nav_state = match self.core.nav_bar_active() {
-                        true => ShowState::Show,
-                        false => ShowState::Hide,
-                    };
-
-                    if let Err(err) = self
-                        .config
-                        .set_last_preview_showstate(handler, current_preview_state)
-                    {
-                        eprintln!("{err}");
-                    }
-
-                    if let Err(err) = self
-                        .config
-                        .set_last_navbar_showstate(handler, current_nav_state)
-                    {
-                        eprintln!("{err}");
-                    }
-
-                    if let Err(err) = self.config.set_last_open_file(handler, path.clone()) {
-                        eprintln!("{err}");
-                    }
-                }
-
-                if *is_dirty {
-                    if (path.is_some() && history.history_index != 0)
-                        || (path.is_none() && !editor_content.text().trim().is_empty())
-                    {
-                        println!("TODO: We're here but for some reason it doesn't work");
-                        //self.update(Message::DialogAction(
-                        //    dialogs::DialogAction::OpenConfirmCloseFileDialog(
-                        //        DiscardChangesAction::CloseApp,
-                        //    ),
-                        //))
-                        process::exit(0);
-                    } else {
-                        process::exit(0);
-                    }
-                } else {
-                    process::exit(0);
-                }
-            }
+            // UI
+            Message::CloseToast(id) => self.handle_close_toast(id),
+            Message::AddToast(toast) => self.handle_add_toast(toast),
+            Message::LaunchUrl(url) => self.handle_launch_url(url),
+            Message::ToggleContextPage(page) => self.handle_toggle_context_page(page),
+            Message::UpdateConfig(config) => self.handle_update_config(config),
+            Message::Surface(a) => self.handle_surface(a),
+            Message::Key(modifiers, key) => self.handle_key(modifiers, key),
+            Message::Modifiers(modifiers) => self.handle_modifiers(modifiers),
+
+            // Menu
+            Message::MenuAction(action) => self.handle_menu_action(action),
+
+            // Dialog & NavBar
+            Message::DialogAction(action) => self.handle_dialog_action(action),
+            Message::NavBarContext(entity) => self.handle_nav_bar_context(entity),
+            Message::NavMenuAction(action) => self.handle_nav_menu_action(action),
+
+            // File
+            Message::Startup => self.handle_startup(),
+            Message::NewFile => self.handle_new_file(),
+            Message::NewVaultFile(name) => self.handle_new_vault_file(name),
+            Message::NewVaultFolder(name) => self.handle_new_vault_folder(name),
+            Message::SaveFile => self.handle_save_file(),
+            Message::OpenFile(result) => self.handle_open_file(result),
+            Message::FileSaved(result) => self.handle_file_saved(result),
+            Message::DiscardChanges(action) => self.handle_discard_changes(action),
+
+            // Vault / Node
+            Message::DeleteNode(entity) => self.handle_delete_node(entity),
+            Message::RenameNode(entity, name) => self.handle_rename_node(entity, name),
+            Message::MoveNode(entity, path) => self.handle_move_node(entity, path),
+            Message::MoveVault => self.handle_move_vault(),
+            Message::VaultMoved(result) => self.handle_vault_moved(result),
+
+            // Editor
+            Message::Edit(action) => self.handle_edit(action),
+            Message::ApplyFormatting(action) => self.handle_apply_formatting(action),
+            Message::Undo => self.handle_undo(),
+            Message::Redo => self.handle_redo(),
+
+            // Preview / Pane
+            Message::UpdateMarkState(msg) => self.handle_update_mark_state(msg),
+            Message::ImageDownloaded(result) => self.handle_image_downloaded(result),
+            Message::SetPreviewState(state) => self.handle_set_preview_state(state),
+            Message::PaneResized(event) => self.handle_pane_resized(event),
+            Message::PaneDragged(event) => self.handle_pane_dragged(event),
+            Message::ScrollChanged(id, viewport) => self.handle_scroll_changed(id, viewport),
+
+            // Config
+            Message::ConfigInput(input) => self.handle_config_input(input),
+
+            // Others
+            Message::ExportPDF => self.handle_export_pdf(),
+            Message::AppCloseRequested(id) => self.handle_app_close_requested(id),
         }
     }
 }
@@ -1723,15 +783,10 @@ impl AppModel {
 //
 
 /// View of the header of this screen
-#[allow(clippy::too_many_arguments)]
 fn cedilla_main_view<'a>(
     app_config: &'a CedillaConfig,
-    path: &'a Option<PathBuf>,
-    editor_content: &'a text_editor::Content,
-    markstate: &'a MarkState,
-    images: &'a HashMap<String, image::Handle>,
-    svgs: &'a HashMap<String, svg::Handle>,
-    is_dirty: &'a bool,
+    editor: &'a EditorState,
+    preview: &'a MarkdownPreview,
     panes: &'a pane_grid::State<PaneContent>,
     preview_state: &'a PreviewState,
 ) -> Element<'a, Message> {
@@ -1747,11 +802,12 @@ fn cedilla_main_view<'a>(
 
             widget::id_container(
                 scrollable(
-                    TextEditor::new(editor_content)
+                    TextEditor::new(&editor.content)
                         .highlight_with::<highlighter::Highlighter>(
                             highlighter::Settings {
                                 theme: highlighter_theme,
-                                token: path
+                                token: editor
+                                    .path
                                     .as_ref()
                                     .and_then(|path| path.extension()?.to_str())
                                     .unwrap_or("md")
@@ -1817,13 +873,13 @@ fn cedilla_main_view<'a>(
                 PaneContent::Editor => create_editor().into(),
                 PaneContent::Preview => container(
                     scrollable(
-                        MarkWidget::new(markstate)
+                        MarkWidget::new(&preview.markstate)
                             .on_updating_state(Message::UpdateMarkState)
                             .on_clicking_link(Message::LaunchUrl)
                             .text_size(app_config.text_size)
                             .code_highlight_theme(highlighter_theme)
                             .on_drawing_image(|info| {
-                                if let Some(image) = images.get(info.url).cloned() {
+                                if let Some(image) = preview.images.get(info.url).cloned() {
                                     let mut img = widget::image(image);
                                     if let Some(w) = info.width {
                                         img = img.width(w);
@@ -1832,7 +888,7 @@ fn cedilla_main_view<'a>(
                                         img = img.height(h);
                                     }
                                     img.into()
-                                } else if let Some(svg_f) = svgs.get(info.url).cloned() {
+                                } else if let Some(svg_f) = preview.svgs.get(info.url).cloned() {
                                     let mut svg = widget::svg(svg_f);
                                     if let Some(w) = info.width {
                                         svg = svg.width(w);
@@ -1867,7 +923,7 @@ fn cedilla_main_view<'a>(
     };
 
     let status_bar: Element<Message> = {
-        let file_path = match path.as_deref().and_then(Path::to_str) {
+        let file_path = match editor.path.as_deref().and_then(Path::to_str) {
             Some(path) => {
                 if path.starts_with(&app_config.vault_path) {
                     let relative = path
@@ -1881,14 +937,14 @@ fn cedilla_main_view<'a>(
             None => text(fl!("new-file")).size(12),
         };
 
-        let dirty_indicator = if *is_dirty {
+        let dirty_indicator = if editor.is_dirty {
             text("•").size(12)
         } else {
             text("").size(12)
         };
 
         let position = {
-            let cursor = editor_content.cursor();
+            let cursor = editor.content.cursor();
             text(format!(
                 "{}:{}",
                 cursor.position.line + 1,
@@ -1973,10 +1029,19 @@ fn cedilla_main_view<'a>(
         .into()
 }
 
+/// Returns the text editor scrollable Id
 fn editor_scrollable_id() -> widget::Id {
     widget::Id::new("editor_scroll")
 }
 
+/// Returns the cotnent preview scrollable Id
 fn preview_scrollable_id() -> widget::Id {
     widget::Id::new("preview_scroll")
+}
+
+/// Creates the default panes for the app
+fn create_default_panes() -> pane_grid::State<PaneContent> {
+    let (mut panes, first_pane) = pane_grid::State::new(PaneContent::Editor);
+    panes.split(pane_grid::Axis::Vertical, first_pane, PaneContent::Preview);
+    panes
 }
