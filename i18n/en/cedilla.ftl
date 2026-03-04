@@ -11,6 +11,7 @@ name = Name
 <#-- About Page -->
 repository = Repository
 support = Support
+donations = Donate
 
 <#-- Main App -->
 editor = Editor
