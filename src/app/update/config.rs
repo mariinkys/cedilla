@@ -1,12 +1,26 @@
 // SPDX-License-Identifier: GPL-3.0
 
 use crate::app::{AppModel, Message};
-use crate::config::{AppTheme, ConfigInput};
+use crate::config::{AppTheme, CedillaConfig, ConfigInput};
 use cosmic::prelude::*;
 
 impl AppModel {
+    /// Applies a config change via the handler, falling back to an in-memory update if the handler fails or is missing.
+    fn apply_config<F>(&mut self, updater: F) -> Task<cosmic::Action<Message>>
+    where
+        F: FnOnce(&mut CedillaConfig, Option<&cosmic::cosmic_config::Config>) -> Result<(), String>,
+    {
+        if let Some(handler) = &self.config_handler {
+            if let Err(err) = updater(&mut self.config, Some(handler)) {
+                eprintln!("{err}");
+            }
+        } else {
+            let _ = updater(&mut self.config, None);
+        }
+        Task::none()
+    }
+
     pub fn handle_config_input(&mut self, input: ConfigInput) -> Task<cosmic::Action<Message>> {
-        #[allow(clippy::collapsible_if)]
         match input {
             ConfigInput::UpdateTheme(index) => {
                 let app_theme = match index {
@@ -18,82 +32,78 @@ impl AppModel {
                 if let Some(handler) = &self.config_handler {
                     if let Err(err) = self.config.set_app_theme(handler, app_theme) {
                         eprintln!("{err}");
-                        let mut old_config = self.config.clone();
-                        old_config.app_theme = app_theme;
-                        self.config = old_config;
+                        self.config.app_theme = app_theme;
                     }
-
-                    return cosmic::command::set_theme(self.config.app_theme.theme());
+                } else {
+                    self.config.app_theme = app_theme;
                 }
-                Task::none()
+
+                cosmic::command::set_theme(self.config.app_theme.theme())
             }
             ConfigInput::HelperHeaderBarShowState(show_state) => {
-                if let Some(handler) = &self.config_handler {
-                    if let Err(err) = self.config.set_show_helper_header_bar(handler, show_state) {
-                        eprintln!("{err}");
-                        let mut old_config = self.config.clone();
-                        old_config.show_helper_header_bar = show_state;
-                        self.config = old_config;
+                self.apply_config(|config, handler| {
+                    if let Some(h) = handler {
+                        config
+                            .set_show_helper_header_bar(h, show_state)
+                            .map_err(|e| e.to_string())?;
+                    } else {
+                        config.show_helper_header_bar = show_state;
                     }
-                }
-                Task::none()
+                    Ok(())
+                })
             }
-            ConfigInput::StatusBarShowState(show_state) => {
-                if let Some(handler) = &self.config_handler {
-                    if let Err(err) = self.config.set_show_status_bar(handler, show_state) {
-                        eprintln!("{err}");
-                        let mut old_config = self.config.clone();
-                        old_config.show_status_bar = show_state;
-                        self.config = old_config;
-                    }
+            ConfigInput::StatusBarShowState(show_state) => self.apply_config(|config, handler| {
+                if let Some(h) = handler {
+                    config
+                        .set_show_status_bar(h, show_state)
+                        .map_err(|e| e.to_string())?;
+                } else {
+                    config.show_status_bar = show_state;
                 }
-                Task::none()
-            }
-            ConfigInput::OpenLastFile(state) => {
-                if let Some(handler) = &self.config_handler {
-                    if let Err(err) = self.config.set_open_last_file(handler, state) {
-                        eprintln!("{err}");
-                        let mut old_config = self.config.clone();
-                        old_config.open_last_file = state;
-                        self.config = old_config;
-                    }
+                Ok(())
+            }),
+            ConfigInput::OpenLastFile(state) => self.apply_config(|config, handler| {
+                if let Some(h) = handler {
+                    config
+                        .set_open_last_file(h, state)
+                        .map_err(|e| e.to_string())?;
+                } else {
+                    config.open_last_file = state;
                 }
-                Task::none()
-            }
-            ConfigInput::ScrollbarSync(state) => {
-                if let Some(handler) = &self.config_handler {
-                    if let Err(err) = self.config.set_scrollbar_sync(handler, state) {
-                        eprintln!("{err}");
-                        let mut old_config = self.config.clone();
-                        old_config.scrollbar_sync = state;
-                        self.config = old_config;
-                    }
+                Ok(())
+            }),
+            ConfigInput::ScrollbarSync(state) => self.apply_config(|config, handler| {
+                if let Some(h) = handler {
+                    config
+                        .set_scrollbar_sync(h, state)
+                        .map_err(|e| e.to_string())?;
+                } else {
+                    config.scrollbar_sync = state;
                 }
-                Task::none()
-            }
-            ConfigInput::GotenbergUrlInput(state) => {
-                if let Some(handler) = &self.config_handler {
-                    if let Err(err) = self.config.set_gotenberg_url(handler, state) {
-                        eprintln!("{err}");
-                    }
+                Ok(())
+            }),
+            ConfigInput::GotenbergUrlInput(state) => self.apply_config(|config, handler| {
+                if let Some(h) = handler {
+                    config
+                        .set_gotenberg_url(h, state)
+                        .map_err(|e| e.to_string())?;
                 }
-                Task::none()
-            }
+                Ok(())
+            }),
             ConfigInput::GotenbergUrlSave => {
                 self.gotenberg_client = gotenberg_pdf::Client::new(&self.config.gotenberg_url);
                 Task::none()
             }
             ConfigInput::UpdateTextSize(new_size) => {
                 let size = new_size as i32;
-                if let Some(handler) = &self.config_handler {
-                    if let Err(err) = self.config.set_text_size(handler, size) {
-                        eprintln!("{err}");
-                        let mut old_config = self.config.clone();
-                        old_config.text_size = size;
-                        self.config = old_config;
+                self.apply_config(|config, handler| {
+                    if let Some(h) = handler {
+                        config.set_text_size(h, size).map_err(|e| e.to_string())?;
+                    } else {
+                        config.text_size = size;
                     }
-                }
-                Task::none()
+                    Ok(())
+                })
             }
         }
     }
