@@ -10,6 +10,7 @@
 
   <name>Cedilla</name>
   <summary>Markdown Text Editor</summary>
+  <summary xml:lang="cs">Editor textu Markdown</summary>
 
   <metadata_license>CC0-1.0</metadata_license>
   <project_license>GPL-3.0-only</project_license>
@@ -20,15 +21,27 @@
       distractions. Whether you're taking notes, drafting documentation, or writing blog posts,
       Cedilla provides a clean and intuitive environment for working with plain text and
       Markdown.</p>
+    <p xml:lang="cs"
+        >Cedilla je jednoduchý editor textu Markdown, navržený pro psaní bez zbytečného
+      rozptylování. Ať už si děláte poznámky, připravujete dokumentaci nebo píšete blogové příspěvky,
+      Cedilla nabízí čisté a intuitivní prostředí pro práci s prostým textem a také
+      Markdownem.</p>
     <ul>
       <li>Clean and minimal writing interface</li>
+      <li xml:lang="cs">Čisté a minimalistické uživatelské rozhraní pro psaní</li>
       <li>Live Markdown preview</li>
+      <li xml:lang="cs">Živý náhled Markdownu</li>
       <li>Fast and lightweight</li>
+      <li xml:lang="cs">Rychlý a lehký</li>
       <li>Works completely offline</li>
+      <li xml:lang="cs">Funguje zcela offline</li>
     </ul>
     <p
         >This app has been developed with libcosmic for the COSMIC™ desktop, and issues may occur on
       other platforms</p>
+    <p xml:lang="cs"
+        >Tato aplikace byla vyvinuta za pomoci libcosmic pro prostředí COSMIC™ a na jiných platformách
+      mohou nastat problémy.</p>
   </description>
 
   <icon type="remote" height="256" width="256">
@@ -42,15 +55,17 @@
   </provides>
 
   <screenshots>
-    <screenshot type="default" xml:lang="en">
+    <screenshot type="default">
       <image>
         https://raw.githubusercontent.com/mariinkys/cedilla/main/resources/screenshots/main-light.png</image>
       <caption>Main Page (Light)</caption>
+      <caption xml:lang="cs">Hlavní stránka (Světlý režim)</caption>
     </screenshot>
-    <screenshot xml:lang="en">
+    <screenshot>
       <image>
         https://raw.githubusercontent.com/mariinkys/cedilla/main/resources/screenshots/main-dark.png</image>
       <caption>Main Page (Dark)</caption>
+      <caption xml:lang="cs">Hlavní stránka (Tmavý režim)</caption>
     </screenshot>
   </screenshots>
 
@@ -87,6 +102,11 @@
     <keyword>Documentation</keyword>
     <keyword>Markup</keyword>
     <keyword>Preview</keyword>
+
+    <keyword xml:lang="cs">Psaní</keyword>
+    <keyword xml:lang="cs">Poznámky</keyword>
+    <keyword xml:lang="cs">Dokumentace</keyword>
+    <keyword xml:lang="cs">Náhled</keyword>
   </keywords>
 
   <releases>
