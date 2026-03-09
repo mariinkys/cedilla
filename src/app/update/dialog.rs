@@ -45,6 +45,30 @@ impl AppModel {
 
                 self.handle_dialog_action(dialogs::DialogAction::OpenMoveNodeDialog(entity))
             }
+            NavMenuAction::OpenNodeFileManager(entity) => {
+                if let Some(entity) = self
+                    .nav_model
+                    .data::<crate::app::core::project::ProjectNode>(entity)
+                {
+                    let path = match entity {
+                        crate::app::core::project::ProjectNode::Folder { path, .. } => path,
+                        crate::app::core::project::ProjectNode::File { path, .. } => {
+                            // a file should always have a parent
+                            path.parent().unwrap()
+                        }
+                    };
+
+                    match open::that(path) {
+                        Ok(()) => Task::none(),
+                        Err(err) => {
+                            eprintln!("failed to open {path:?}: {err}");
+                            Task::none()
+                        }
+                    }
+                } else {
+                    Task::none()
+                }
+            }
         }
     }
 }

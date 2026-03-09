@@ -48,6 +48,8 @@ impl AppModel {
                 content: text_editor::Content::new(),
                 is_dirty: true,
                 history: HistoryState::default(),
+                last_editor_viewport: None,
+                last_editor_scroll_y: 0.0,
             },
             preview: MarkdownPreview {
                 markstate: MarkState::with_html_and_markdown(""),
@@ -70,6 +72,8 @@ impl AppModel {
                 content: text_editor::Content::new(),
                 is_dirty: true,
                 history: HistoryState::default(),
+                last_editor_viewport: None,
+                last_editor_scroll_y: 0.0,
             },
             preview: MarkdownPreview {
                 markstate: MarkState::with_html_and_markdown(""),
@@ -118,6 +122,8 @@ impl AppModel {
                 content: text_editor::Content::new(),
                 is_dirty: true,
                 history: HistoryState::default(),
+                last_editor_viewport: None,
+                last_editor_scroll_y: 0.0,
             },
             preview: MarkdownPreview {
                 markstate: MarkState::with_html_and_markdown(""),
@@ -221,6 +227,8 @@ impl AppModel {
                         content: text_editor::Content::with_text(content.as_ref()),
                         is_dirty: false,
                         history: HistoryState::new_with_content(content.to_string()),
+                        last_editor_viewport: None,
+                        last_editor_scroll_y: 0.0,
                     },
                     preview: MarkdownPreview {
                         markstate,

@@ -205,6 +205,7 @@ pub enum NavMenuAction {
     DeleteNode(segmented_button::Entity),
     RenameNode(segmented_button::Entity),
     MoveNode(segmented_button::Entity),
+    OpenNodeFileManager(segmented_button::Entity),
 }
 
 impl cosmic::widget::menu::Action for NavMenuAction {
@@ -404,15 +405,39 @@ impl cosmic::Application for AppModel {
             return Some(vec![]);
         }
 
-        // no context menu for root node
+        // only one entry for root node
         if self.nav_model.indent(entity).unwrap_or(0) == 0 {
-            return Some(vec![]);
+            return Some(cosmic::widget::menu::items(
+                &std::collections::HashMap::new(),
+                vec![
+                    cosmic::widget::menu::Item::ButtonDisabled(
+                        fl!("delete"),
+                        None,
+                        NavMenuAction::DeleteNode(entity),
+                    ),
+                    cosmic::widget::menu::Item::ButtonDisabled(
+                        fl!("rename"),
+                        None,
+                        NavMenuAction::RenameNode(entity),
+                    ),
+                    cosmic::widget::menu::Item::ButtonDisabled(
+                        fl!("move-to"),
+                        None,
+                        NavMenuAction::MoveNode(entity),
+                    ),
+                    cosmic::widget::menu::Item::Button(
+                        fl!("open-file-manager"),
+                        None,
+                        NavMenuAction::OpenNodeFileManager(entity),
+                    ),
+                ],
+            ));
         }
 
         // no need to use this for now as we don't have different context menu options for files and folders
         //let node = self.nav_model.data::<ProjectNode>(entity)?;
 
-        let mut items = Vec::with_capacity(3);
+        let mut items = Vec::with_capacity(4);
 
         items.push(cosmic::widget::menu::Item::Button(
             fl!("delete"),
@@ -428,6 +453,11 @@ impl cosmic::Application for AppModel {
             fl!("move-to"),
             None,
             NavMenuAction::MoveNode(entity),
+        ));
+        items.push(cosmic::widget::menu::Item::Button(
+            fl!("open-file-manager"),
+            None,
+            NavMenuAction::OpenNodeFileManager(entity),
         ));
 
         Some(cosmic::widget::menu::items(

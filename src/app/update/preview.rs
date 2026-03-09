@@ -90,22 +90,25 @@ impl AppModel {
         source_id: widget::Id,
         viewport: scrollable::Viewport,
     ) -> Task<cosmic::Action<Message>> {
-        let State::Ready { .. } = &mut self.state else {
+        let State::Ready { editor, .. } = &mut self.state else {
             return Task::none();
         };
+
+        if source_id == editor_scrollable_id() {
+            editor.last_editor_viewport = Some(viewport);
+            editor.last_editor_scroll_y = viewport.absolute_offset().y;
+        }
 
         if self.config.scrollbar_sync != BoolState::Yes {
             return Task::none();
         }
 
+        if source_id != editor_scrollable_id() {
+            return Task::none();
+        }
+
         let offset = viewport.absolute_offset();
 
-        let target_id = if source_id == editor_scrollable_id() {
-            preview_scrollable_id()
-        } else {
-            editor_scrollable_id()
-        };
-
-        scrollable::scroll_to(target_id, offset.into()).map(cosmic::action::app)
+        scrollable::scroll_to(preview_scrollable_id(), offset.into()).map(cosmic::action::app)
     }
 }

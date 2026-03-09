@@ -6,6 +6,7 @@ delete = Delete
 rename = Rename
 move = Move
 move-to = Move To
+open-file-manager = Reveal in File Manager
 name = Name
 
 <#-- About Page -->
