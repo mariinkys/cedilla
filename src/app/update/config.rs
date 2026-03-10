@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0
 
 use crate::app::{AppModel, Message};
-use crate::config::{AppTheme, CedillaConfig, ConfigInput};
+use crate::config::{AppTheme, CedillaConfig, CedillaHighlighterTheme, ConfigInput};
 use cosmic::prelude::*;
 
 impl AppModel {
@@ -104,6 +104,40 @@ impl AppModel {
                     }
                     Ok(())
                 })
+            }
+            ConfigInput::UpdateLightHighlighterTheme(index) => {
+                if let Some(&theme) = cosmic::iced::highlighter::Theme::ALL.get(index) {
+                    let theme = CedillaHighlighterTheme::from(theme);
+                    self.apply_config(move |config, handler| {
+                        if let Some(h) = handler {
+                            config
+                                .set_light_highlighter_theme(h, theme)
+                                .map_err(|e| e.to_string())?;
+                        } else {
+                            config.light_highlighter_theme = theme;
+                        }
+                        Ok(())
+                    })
+                } else {
+                    Task::none()
+                }
+            }
+            ConfigInput::UpdateDarkHighlighterTheme(index) => {
+                if let Some(&theme) = cosmic::iced::highlighter::Theme::ALL.get(index) {
+                    let theme = CedillaHighlighterTheme::from(theme);
+                    self.apply_config(move |config, handler| {
+                        if let Some(h) = handler {
+                            config
+                                .set_dark_highlighter_theme(h, theme)
+                                .map_err(|e| e.to_string())?;
+                        } else {
+                            config.dark_highlighter_theme = theme;
+                        }
+                        Ok(())
+                    })
+                } else {
+                    Task::none()
+                }
             }
         }
     }

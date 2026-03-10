@@ -65,6 +65,8 @@ pub struct AppModel {
     config: CedillaConfig,
     // Application Themes
     app_themes: Vec<String>,
+    // Syntax Highlighting Themes
+    highlighter_themes: Vec<String>,
     /// Currently selected path on the navbar (i need these for accurate file creadtion deletion...)
     selected_nav_path: Option<PathBuf>,
     /// Gotenberg client, needed for Pdf exporting
@@ -271,6 +273,10 @@ impl cosmic::Application for AppModel {
             config_handler: flags.config_handler,
             config: flags.config,
             app_themes: vec![fl!("match-desktop"), fl!("dark"), fl!("light")],
+            highlighter_themes: highlighter::Theme::ALL
+                .iter()
+                .map(|t| t.to_string())
+                .collect(),
             selected_nav_path: None,
             gotenberg_client: gotenberg_pdf::Client::new(&gotenberg_url),
             state: State::Loading,
@@ -698,6 +704,14 @@ impl AppModel {
             AppTheme::System => 0,
         };
 
+        let light_theme_selected = highlighter::Theme::ALL
+            .iter()
+            .position(|t| *t == self.config.light_highlighter_theme.0);
+
+        let dark_theme_selected = highlighter::Theme::ALL
+            .iter()
+            .position(|t| *t == self.config.dark_highlighter_theme.0);
+
         widget::settings::view_column(vec![
             widget::settings::section()
                 .title(fl!("appearance"))
@@ -707,6 +721,20 @@ impl AppModel {
                         Some(app_theme_selected),
                         |t| Message::ConfigInput(ConfigInput::UpdateTheme(t)),
                     )),
+                )
+                .add(
+                    widget::settings::item::builder(fl!("light-highlighter")).control(
+                        widget::dropdown(&self.highlighter_themes, light_theme_selected, |index| {
+                            Message::ConfigInput(ConfigInput::UpdateLightHighlighterTheme(index))
+                        }),
+                    ),
+                )
+                .add(
+                    widget::settings::item::builder(fl!("dark-highlighter")).control(
+                        widget::dropdown(&self.highlighter_themes, dark_theme_selected, |index| {
+                            Message::ConfigInput(ConfigInput::UpdateDarkHighlighterTheme(index))
+                        }),
+                    ),
                 )
                 .into(),
             widget::settings::section()
@@ -825,10 +853,16 @@ fn cedilla_main_view<'a>(
 
     let create_editor = || {
         container(responsive(|size| {
-            let highlighter_theme = match app_config.app_theme {
-                AppTheme::Dark => highlighter::Theme::Base16Ocean,
-                AppTheme::Light => highlighter::Theme::InspiredGitHub,
-                AppTheme::System => highlighter::Theme::Base16Ocean,
+            let highlighter_theme: highlighter::Theme = match app_config.app_theme {
+                AppTheme::Dark => app_config.dark_highlighter_theme.into(),
+                AppTheme::Light => app_config.light_highlighter_theme.into(),
+                AppTheme::System => {
+                    if theme::is_dark() {
+                        app_config.dark_highlighter_theme.into()
+                    } else {
+                        app_config.light_highlighter_theme.into()
+                    }
+                }
             };
 
             scrollable(
@@ -891,10 +925,16 @@ fn cedilla_main_view<'a>(
                 PaneContent::Preview => (fl!("preview"), "show-symbolic"),
             };
 
-            let highlighter_theme = match app_config.app_theme {
-                AppTheme::Dark => highlighter::Theme::Base16Ocean,
-                AppTheme::Light => highlighter::Theme::InspiredGitHub,
-                AppTheme::System => highlighter::Theme::Base16Ocean,
+            let highlighter_theme: highlighter::Theme = match app_config.app_theme {
+                AppTheme::Dark => app_config.dark_highlighter_theme.into(),
+                AppTheme::Light => app_config.light_highlighter_theme.into(),
+                AppTheme::System => {
+                    if theme::is_dark() {
+                        app_config.dark_highlighter_theme.into()
+                    } else {
+                        app_config.light_highlighter_theme.into()
+                    }
+                }
             };
 
             let pane_content: Element<'a, Message> = match content {

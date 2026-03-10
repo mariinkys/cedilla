@@ -26,6 +26,8 @@ pub struct CedillaConfig {
     pub scrollbar_sync: BoolState,
     pub gotenberg_url: String,
     pub text_size: i32,
+    pub light_highlighter_theme: CedillaHighlighterTheme,
+    pub dark_highlighter_theme: CedillaHighlighterTheme,
 }
 
 impl Default for CedillaConfig {
@@ -48,6 +50,12 @@ impl Default for CedillaConfig {
             scrollbar_sync: BoolState::default(),
             gotenberg_url: String::new(),
             text_size: 16,
+            light_highlighter_theme: CedillaHighlighterTheme::from(
+                cosmic::iced::highlighter::Theme::InspiredGitHub,
+            ),
+            dark_highlighter_theme: CedillaHighlighterTheme::from(
+                cosmic::iced::highlighter::Theme::Base16Ocean,
+            ),
         }
     }
 }
@@ -174,6 +182,44 @@ impl BoolState {
     }
 }
 
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub struct CedillaHighlighterTheme(pub cosmic::iced::highlighter::Theme);
+
+impl Serialize for CedillaHighlighterTheme {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: serde::Serializer,
+    {
+        serializer.serialize_u8(self.0 as u8)
+    }
+}
+
+impl<'de> Deserialize<'de> for CedillaHighlighterTheme {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: serde::Deserializer<'de>,
+    {
+        let n = u8::deserialize(deserializer)?;
+        cosmic::iced::highlighter::Theme::ALL
+            .get(n as usize)
+            .copied()
+            .map(CedillaHighlighterTheme)
+            .ok_or_else(|| serde::de::Error::custom(format!("invalid theme index: {n}")))
+    }
+}
+
+impl From<cosmic::iced::highlighter::Theme> for CedillaHighlighterTheme {
+    fn from(theme: cosmic::iced::highlighter::Theme) -> Self {
+        CedillaHighlighterTheme(theme)
+    }
+}
+
+impl From<CedillaHighlighterTheme> for cosmic::iced::highlighter::Theme {
+    fn from(theme: CedillaHighlighterTheme) -> Self {
+        theme.0
+    }
+}
+
 /// Represents the different inputs that can happen in the config [`ContextPage`]
 #[derive(Debug, Clone)]
 pub enum ConfigInput {
@@ -193,4 +239,8 @@ pub enum ConfigInput {
     GotenbergUrlSave,
     /// Update the editor and preview text size
     UpdateTextSize(u16),
+    /// Update the highlighter theme for light app themes
+    UpdateLightHighlighterTheme(usize),
+    /// Update the highlighter theme for dark app themes
+    UpdateDarkHighlighterTheme(usize),
 }

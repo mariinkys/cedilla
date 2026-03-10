@@ -31,6 +31,8 @@ theme = Theme
 match-desktop = Match desktop
 dark = Dark
 light = Light
+dark-highlighter = Dark Highlighter Theme
+light-highlighter = Light Highlighter Theme
 
 <#-- Settings Context Page -->
 general = General
