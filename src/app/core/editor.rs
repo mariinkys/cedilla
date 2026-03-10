@@ -13,6 +13,12 @@ pub struct EditorState {
     pub is_dirty: bool,
     /// Allows us to undo and redo
     pub history: HistoryState,
+    /// Holds state about the scrollbars/scrolling of the editor
+    pub scroll: EditorScrollState,
+}
+
+#[derive(Default)]
+pub struct EditorScrollState {
     /// Allows us to correctly follow the cursor with the scrollbar
     pub last_editor_viewport: Option<cosmic::iced_widget::scrollable::Viewport>,
     /// Allows us to correctly follow the cursor with the scrollbar

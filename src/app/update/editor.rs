@@ -28,18 +28,18 @@ impl AppModel {
             let cursor_line = editor.content.cursor().position.line;
 
             if cursor_line + 1 >= total_lines {
-                if let Some(vp) = editor.last_editor_viewport {
+                if let Some(vp) = editor.scroll.last_editor_viewport {
                     let content_height = vp.content_bounds().height;
                     let viewport_height = vp.bounds().height;
                     let real_line_height = content_height / total_lines.max(1) as f32;
                     let cursor_y = cursor_line as f32 * real_line_height;
 
                     if cursor_y + real_line_height * 3.0
-                        > editor.last_editor_scroll_y + viewport_height
+                        > editor.scroll.last_editor_scroll_y + viewport_height
                     {
                         let new_y = (cursor_y + real_line_height * 3.0 - viewport_height)
-                            .max(editor.last_editor_scroll_y);
-                        editor.last_editor_scroll_y = new_y;
+                            .max(editor.scroll.last_editor_scroll_y);
+                        editor.scroll.last_editor_scroll_y = new_y;
                         cosmic::iced_widget::scrollable::scroll_to(
                             editor_scrollable_id(),
                             cosmic::iced_widget::scrollable::AbsoluteOffset {

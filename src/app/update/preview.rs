@@ -95,8 +95,8 @@ impl AppModel {
         };
 
         if source_id == editor_scrollable_id() {
-            editor.last_editor_viewport = Some(viewport);
-            editor.last_editor_scroll_y = viewport.absolute_offset().y;
+            editor.scroll.last_editor_viewport = Some(viewport);
+            editor.scroll.last_editor_scroll_y = viewport.absolute_offset().y;
         }
 
         if self.config.scrollbar_sync != BoolState::Yes {

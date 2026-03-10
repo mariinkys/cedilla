@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0
 
-use crate::app::core::editor::EditorState;
+use crate::app::core::editor::{EditorScrollState, EditorState};
 use crate::app::core::history::HistoryState;
 use crate::app::core::preview::MarkdownPreview;
 use crate::app::core::utils::{self, CedillaToast};
@@ -48,8 +48,7 @@ impl AppModel {
                 content: text_editor::Content::new(),
                 is_dirty: true,
                 history: HistoryState::default(),
-                last_editor_viewport: None,
-                last_editor_scroll_y: 0.0,
+                scroll: EditorScrollState::default(),
             },
             preview: MarkdownPreview {
                 markstate: MarkState::with_html_and_markdown(""),
@@ -72,8 +71,7 @@ impl AppModel {
                 content: text_editor::Content::new(),
                 is_dirty: true,
                 history: HistoryState::default(),
-                last_editor_viewport: None,
-                last_editor_scroll_y: 0.0,
+                scroll: EditorScrollState::default(),
             },
             preview: MarkdownPreview {
                 markstate: MarkState::with_html_and_markdown(""),
@@ -122,8 +120,7 @@ impl AppModel {
                 content: text_editor::Content::new(),
                 is_dirty: true,
                 history: HistoryState::default(),
-                last_editor_viewport: None,
-                last_editor_scroll_y: 0.0,
+                scroll: EditorScrollState::default(),
             },
             preview: MarkdownPreview {
                 markstate: MarkState::with_html_and_markdown(""),
@@ -227,8 +224,7 @@ impl AppModel {
                         content: text_editor::Content::with_text(content.as_ref()),
                         is_dirty: false,
                         history: HistoryState::new_with_content(content.to_string()),
-                        last_editor_viewport: None,
-                        last_editor_scroll_y: 0.0,
+                        scroll: EditorScrollState::default(),
                     },
                     preview: MarkdownPreview {
                         markstate,
