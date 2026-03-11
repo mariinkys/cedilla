@@ -1,0 +1,27 @@
+[package]
+name = "frostmark"
+version = "0.1.0"
+edition = "2024"
+license = "GPL-3.0"
+description = "HTML/Markdown renderer for libcosmic"
+
+[dependencies]
+libcosmic.workspace = true
+html5ever = "0.38"
+markup5ever_rcdom = "0.38.0"
+bitflags = "2.11.0"
+
+comrak = { version = "0.50", default-features = false, optional = true }
+widgets = { path = "../widgets" }
+
+[dev-dependencies]
+tokio.workspace = true
+reqwest.workspace = true
+open.workspace = true
+
+[features]
+default = ["markdown", "libcosmic-wgpu", "libcosmic-tokio", "libcosmic-windowing"]
+markdown = ["dep:comrak"]
+libcosmic-wgpu = ["libcosmic/wgpu"]
+libcosmic-tokio = ["libcosmic/tokio"]
+libcosmic-windowing = ["libcosmic/x11", "libcosmic/wayland"]

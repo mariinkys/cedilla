@@ -22,6 +22,10 @@ pub enum MenuAction {
     OpenFile,
     /// Create a new empty file
     NewFile,
+    /// Create a new vault file
+    NewVaultFile,
+    /// Create a new vault folder
+    NewVaultFolder,
     /// Save the current file
     SaveFile,
     /// Toggle the preview for the current file
@@ -41,6 +45,8 @@ impl menu::action::MenuAction for MenuAction {
             MenuAction::Settings => Message::MenuAction(MenuAction::Settings),
             MenuAction::OpenFile => Message::MenuAction(MenuAction::OpenFile),
             MenuAction::NewFile => Message::MenuAction(MenuAction::NewFile),
+            MenuAction::NewVaultFile => Message::MenuAction(MenuAction::NewVaultFile),
+            MenuAction::NewVaultFolder => Message::MenuAction(MenuAction::NewVaultFolder),
             MenuAction::SaveFile => Message::MenuAction(MenuAction::SaveFile),
             MenuAction::TogglePreview => Message::MenuAction(MenuAction::TogglePreview),
             MenuAction::Undo => Message::MenuAction(MenuAction::Undo),
@@ -73,9 +79,12 @@ pub fn menu_bar<'a>(core: &Core, key_binds: &HashMap<KeyBind, MenuAction>) -> El
                 (
                     fl!("file"),
                     vec![
-                        MenuItem::Button(fl!("new-file"), None, MenuAction::NewFile),
+                        MenuItem::Button(fl!("new-vault-file"), None, MenuAction::NewVaultFile),
+                        MenuItem::Button(fl!("new-folder"), None, MenuAction::NewVaultFolder),
                         MenuItem::Button(fl!("open-file"), None, MenuAction::OpenFile),
                         MenuItem::Button(fl!("save-file"), None, MenuAction::SaveFile),
+                        MenuItem::Divider,
+                        MenuItem::Button(fl!("new-file"), None, MenuAction::NewFile),
                     ],
                 ),
                 (

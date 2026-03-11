@@ -24,7 +24,9 @@ pub fn key_binds() -> HashMap<KeyBind, MenuAction> {
         }};
     }
 
-    bind!([Ctrl], Key::Character("t".into()), NewFile);
+    bind!([Ctrl], Key::Character("t".into()), NewVaultFile);
+    bind!([Ctrl], Key::Character("n".into()), NewVaultFolder);
+    bind!([Ctrl, Shift], Key::Character("t".into()), NewFile);
     bind!([Ctrl], Key::Character("s".into()), SaveFile);
     bind!([Ctrl], Key::Character("o".into()), OpenFile);
 

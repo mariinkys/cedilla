@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0
 
-use std::{fmt::Display, sync::LazyLock};
+use std::{fmt::Display, path::PathBuf, sync::LazyLock};
 
 use cosmic::{
     cosmic_config::{self, Config, CosmicConfigEntry, cosmic_config_derive::CosmicConfigEntry},
@@ -13,11 +13,51 @@ use crate::fl;
 const APP_ID: &str = "dev.mariinkys.Cedilla";
 const CONFIG_VERSION: u64 = 1;
 
-#[derive(Debug, Default, Clone, CosmicConfigEntry, Eq, PartialEq)]
+#[derive(Debug, Clone, CosmicConfigEntry, Eq, PartialEq)]
 pub struct CedillaConfig {
     pub app_theme: AppTheme,
+    pub vault_path: String,
     pub show_helper_header_bar: ShowState,
     pub show_status_bar: ShowState,
+    pub last_navbar_showstate: ShowState,
+    pub last_preview_showstate: ShowState,
+    pub open_last_file: BoolState,
+    pub last_open_file: Option<PathBuf>,
+    pub scrollbar_sync: BoolState,
+    pub gotenberg_url: String,
+    pub text_size: i32,
+    pub light_highlighter_theme: CedillaHighlighterTheme,
+    pub dark_highlighter_theme: CedillaHighlighterTheme,
+}
+
+impl Default for CedillaConfig {
+    fn default() -> Self {
+        let vault_path = dirs::data_dir().unwrap().join(APP_ID).join("vault");
+
+        if !vault_path.exists() {
+            std::fs::create_dir_all(&vault_path).expect("Failed to create vault directory");
+        }
+
+        Self {
+            app_theme: AppTheme::default(),
+            vault_path: vault_path.to_string_lossy().to_string(),
+            show_helper_header_bar: ShowState::default(),
+            show_status_bar: ShowState::default(),
+            last_navbar_showstate: ShowState::default(),
+            last_preview_showstate: ShowState::default(),
+            open_last_file: BoolState::default(),
+            last_open_file: None,
+            scrollbar_sync: BoolState::default(),
+            gotenberg_url: String::new(),
+            text_size: 16,
+            light_highlighter_theme: CedillaHighlighterTheme::from(
+                cosmic::iced::highlighter::Theme::InspiredGitHub,
+            ),
+            dark_highlighter_theme: CedillaHighlighterTheme::from(
+                cosmic::iced::highlighter::Theme::Base16Ocean,
+            ),
+        }
+    }
 }
 
 impl CedillaConfig {
@@ -35,6 +75,16 @@ impl CedillaConfig {
             }
             None => CedillaConfig::default(),
         }
+    }
+
+    /// Returns the current vault path
+    pub fn vault_path(&self) -> PathBuf {
+        PathBuf::from(&self.vault_path)
+    }
+
+    /// Returns true if the Gotenberg URL is not empty
+    pub fn is_gotenberg_configured(&self) -> bool {
+        !self.gotenberg_url.trim().is_empty()
     }
 }
 
@@ -94,6 +144,82 @@ impl ShowState {
     }
 }
 
+#[derive(Clone, Copy, Debug, Default, Eq, PartialEq, Serialize, Deserialize)]
+pub enum BoolState {
+    #[default]
+    Yes,
+    No,
+}
+
+impl Display for BoolState {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            BoolState::Yes => write!(f, "{}", fl!("yes")),
+            BoolState::No => write!(f, "{}", fl!("no")),
+        }
+    }
+}
+
+impl BoolState {
+    pub fn all_labels() -> &'static [String] {
+        static LABELS: LazyLock<Vec<String>> = LazyLock::new(|| vec![fl!("yes"), fl!("no")]);
+        &LABELS
+    }
+
+    pub fn from_index(index: usize) -> Self {
+        match index {
+            0 => BoolState::Yes,
+            1 => BoolState::No,
+            _ => BoolState::default(),
+        }
+    }
+
+    pub fn to_index(self) -> usize {
+        match self {
+            BoolState::Yes => 0,
+            BoolState::No => 1,
+        }
+    }
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub struct CedillaHighlighterTheme(pub cosmic::iced::highlighter::Theme);
+
+impl Serialize for CedillaHighlighterTheme {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: serde::Serializer,
+    {
+        serializer.serialize_u8(self.0 as u8)
+    }
+}
+
+impl<'de> Deserialize<'de> for CedillaHighlighterTheme {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: serde::Deserializer<'de>,
+    {
+        let n = u8::deserialize(deserializer)?;
+        cosmic::iced::highlighter::Theme::ALL
+            .get(n as usize)
+            .copied()
+            .map(CedillaHighlighterTheme)
+            .ok_or_else(|| serde::de::Error::custom(format!("invalid theme index: {n}")))
+    }
+}
+
+impl From<cosmic::iced::highlighter::Theme> for CedillaHighlighterTheme {
+    fn from(theme: cosmic::iced::highlighter::Theme) -> Self {
+        CedillaHighlighterTheme(theme)
+    }
+}
+
+impl From<CedillaHighlighterTheme> for cosmic::iced::highlighter::Theme {
+    fn from(theme: CedillaHighlighterTheme) -> Self {
+        theme.0
+    }
+}
+
 /// Represents the different inputs that can happen in the config [`ContextPage`]
 #[derive(Debug, Clone)]
 pub enum ConfigInput {
@@ -103,4 +229,18 @@ pub enum ConfigInput {
     HelperHeaderBarShowState(ShowState),
     /// Update the status bar show state
     StatusBarShowState(ShowState),
+    /// Update if the user wants to open last opened file or not
+    OpenLastFile(BoolState),
+    /// Update if the user wants the editor and preview scrollbars to be in sync
+    ScrollbarSync(BoolState),
+    /// Update the current gotenberg client url
+    GotenbergUrlInput(String),
+    /// Save the new gotenberg url
+    GotenbergUrlSave,
+    /// Update the editor and preview text size
+    UpdateTextSize(u16),
+    /// Update the highlighter theme for light app themes
+    UpdateLightHighlighterTheme(usize),
+    /// Update the highlighter theme for dark app themes
+    UpdateDarkHighlighterTheme(usize),
 }

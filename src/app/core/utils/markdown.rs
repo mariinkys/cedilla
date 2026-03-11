@@ -1,11 +1,11 @@
+// SPDX-License-Identifier: GPL-3.0
+
 use std::sync::Arc;
 
 use cosmic::Task;
+use widgets::text_editor;
 
-use crate::app::{
-    AppModel, Message, State,
-    widgets::{markdown, text_editor},
-};
+use crate::app::{AppModel, Message, State};
 
 /// Actions that can be performed on the current text selection
 #[derive(Debug, Clone)]
@@ -28,10 +28,8 @@ pub enum SelectionAction {
     Italic,
     /// Convert selection to hyperlink / Insert hyperlink template
     Hyperlink,
-    /// Convert selection to inline code / Insert code markers
+    /// Convert selection to code
     Code,
-    /// Insert code block
-    CodeBlock,
     /// Convert selection to image / Insert image template
     Image,
     /// Convert selection to bulleted list / Insert list item
@@ -50,27 +48,34 @@ impl AppModel {
         &mut self,
         action: SelectionAction,
     ) -> Task<cosmic::Action<Message>> {
-        let State::Ready {
-            editor_content,
-            is_dirty,
-            items,
-            ..
-        } = &mut self.state
-        else {
+        let State::Ready { editor, .. } = &mut self.state else {
             return Task::none();
         };
 
-        // format the selected text
-        let formatted =
-            format_selected_text(&editor_content.selection().unwrap_or_default(), action);
+        let selection = editor.content.selection().unwrap_or_default();
+        let formatted = format_selected_text(&selection, action);
+        let formatted = formatted.trim_end_matches('\n').to_string();
+        let formatted_len = formatted.chars().count();
 
-        // replace the selection (or insert if no selection)
-        editor_content.perform(text_editor::Action::Edit(text_editor::Edit::Paste(
-            Arc::new(formatted),
-        )));
+        editor
+            .content
+            .perform(text_editor::Action::Edit(text_editor::Edit::Paste(
+                Arc::new(formatted),
+            )));
 
-        *is_dirty = true;
-        *items = markdown::parse(editor_content.text().as_ref()).collect();
+        for _ in 0..formatted_len {
+            editor
+                .content
+                .perform(text_editor::Action::Move(text_editor::Motion::Left));
+        }
+
+        for _ in 0..formatted_len {
+            editor
+                .content
+                .perform(text_editor::Action::Select(text_editor::Motion::Right));
+        }
+
+        editor.is_dirty = true;
 
         Task::none()
     }
@@ -81,16 +86,18 @@ fn format_selected_text(text: &str, action: SelectionAction) -> String {
     let is_empty = text.is_empty();
 
     match action {
-        SelectionAction::Heading1 => format_heading(text, 1),
-        SelectionAction::Heading2 => format_heading(text, 2),
-        SelectionAction::Heading3 => format_heading(text, 3),
-        SelectionAction::Heading4 => format_heading(text, 4),
-        SelectionAction::Heading5 => format_heading(text, 5),
-        SelectionAction::Heading6 => format_heading(text, 6),
+        SelectionAction::Heading1 => toggle_heading(text, 1),
+        SelectionAction::Heading2 => toggle_heading(text, 2),
+        SelectionAction::Heading3 => toggle_heading(text, 3),
+        SelectionAction::Heading4 => toggle_heading(text, 4),
+        SelectionAction::Heading5 => toggle_heading(text, 5),
+        SelectionAction::Heading6 => toggle_heading(text, 6),
 
         SelectionAction::Bold => {
             if is_empty {
-                "**".to_string()
+                "****".to_string()
+            } else if text.starts_with("**") && text.ends_with("**") && text.len() >= 4 {
+                text[2..text.len() - 2].to_string()
             } else {
                 format!("**{}**", text)
             }
@@ -98,7 +105,9 @@ fn format_selected_text(text: &str, action: SelectionAction) -> String {
 
         SelectionAction::Italic => {
             if is_empty {
-                "*".to_string()
+                "**".to_string()
+            } else if is_italic(text) {
+                text[1..text.len() - 1].to_string()
             } else {
                 format!("*{}*", text)
             }
@@ -107,6 +116,8 @@ fn format_selected_text(text: &str, action: SelectionAction) -> String {
         SelectionAction::Hyperlink => {
             if is_empty {
                 "[](url)".to_string()
+            } else if text.starts_with('[') && text.ends_with(')') {
+                text.to_string()
             } else {
                 format!("[{}](url)", text)
             }
@@ -114,23 +125,27 @@ fn format_selected_text(text: &str, action: SelectionAction) -> String {
 
         SelectionAction::Code => {
             if is_empty {
-                "`".to_string()
+                // cycle: nothing → inline → block → nothing
+                "``".to_string()
+            } else if text.starts_with("```") && text.ends_with("```") && text.len() > 6 {
+                // code block → nothing (strip fences)
+                let inner = &text[3..text.len() - 3];
+                inner.trim_matches('\n').to_string()
+            } else if text.starts_with('`') && text.ends_with('`') && text.len() >= 2 {
+                // inline code → code block
+                let inner = &text[1..text.len() - 1];
+                format!("```\n{}\n```", inner)
             } else {
+                // nothing → inline code
                 format!("`{}`", text)
-            }
-        }
-
-        SelectionAction::CodeBlock => {
-            if is_empty {
-                "```\n\n```".to_string()
-            } else {
-                format!("```\n{}\n```", text)
             }
         }
 
         SelectionAction::Image => {
             if is_empty {
                 "![](image-url)".to_string()
+            } else if text.starts_with("![") && text.ends_with(')') {
+                text.to_string()
             } else {
                 format!("![{}](image-url)", text)
             }
@@ -139,6 +154,8 @@ fn format_selected_text(text: &str, action: SelectionAction) -> String {
         SelectionAction::BulletedList => {
             if is_empty {
                 "- ".to_string()
+            } else if all_lines_have_prefix(text, "- ") {
+                remove_line_prefix(text, "- ")
             } else {
                 format_list(text, "- ")
             }
@@ -147,6 +164,8 @@ fn format_selected_text(text: &str, action: SelectionAction) -> String {
         SelectionAction::NumberedList => {
             if is_empty {
                 "1. ".to_string()
+            } else if all_lines_are_numbered(text) {
+                remove_numbered_list(text)
             } else {
                 format_numbered_list(text)
             }
@@ -155,6 +174,9 @@ fn format_selected_text(text: &str, action: SelectionAction) -> String {
         SelectionAction::CheckboxList => {
             if is_empty {
                 "- [ ] ".to_string()
+            } else if all_lines_have_prefix(text, "- [ ] ") || all_lines_have_prefix(text, "- [x] ")
+            {
+                remove_line_prefix(remove_line_prefix(text, "- [ ] ").as_str(), "- [x] ")
             } else {
                 format_list(text, "- [ ] ")
             }
@@ -164,18 +186,83 @@ fn format_selected_text(text: &str, action: SelectionAction) -> String {
     }
 }
 
-/// Format text as a heading of the specified level
-fn format_heading(text: &str, level: usize) -> String {
+fn toggle_heading(text: &str, level: usize) -> String {
     let hashes = "#".repeat(level);
 
     if text.is_empty() {
-        format!("{} ", hashes)
+        return format!("{} ", hashes);
+    }
+
+    let trimmed = text.trim();
+
+    // if already this heading level
+    let this_prefix = format!("{} ", hashes);
+    if trimmed.starts_with(&this_prefix) {
+        return trimmed[this_prefix.len()..].to_string();
+    }
+
+    // check if it's a different heading level, strip it and apply new one
+    let without_existing = strip_heading(trimmed);
+    format!("{} {}", hashes, without_existing.trim())
+}
+
+/// Strip any leading heading markers from text
+fn strip_heading(text: &str) -> &str {
+    let mut chars = text.chars().peekable();
+    let mut count = 0;
+    while chars.peek() == Some(&'#') {
+        chars.next();
+        count += 1;
+    }
+    if count > 0 && chars.peek() == Some(&' ') {
+        &text[count + 1..]
     } else {
-        format!("{} {}", hashes, text.trim())
+        text
     }
 }
 
-/// Format text as a list with the given prefix
+/// Returns true if text is italic but not bold
+fn is_italic(text: &str) -> bool {
+    text.starts_with('*') && text.ends_with('*') && text.len() >= 2 && !text.starts_with("**")
+}
+
+/// Returns true if every line starts with the given prefix
+fn all_lines_have_prefix(text: &str, prefix: &str) -> bool {
+    text.lines().all(|line| line.starts_with(prefix))
+}
+
+/// Remove a prefix from every line
+fn remove_line_prefix(text: &str, prefix: &str) -> String {
+    text.lines()
+        .map(|line| line.strip_prefix(prefix).unwrap_or(line).to_string())
+        .collect::<Vec<_>>()
+        .join("\n")
+}
+
+/// Returns true if every line looks like a numbered list item
+fn all_lines_are_numbered(text: &str) -> bool {
+    text.lines().enumerate().all(|(i, line)| {
+        let prefix = format!("{}. ", i + 1);
+        line.starts_with(&prefix)
+    })
+}
+
+/// Remove numbered list formatting from every line
+fn remove_numbered_list(text: &str) -> String {
+    text.lines()
+        .enumerate()
+        .map(|(i, line)| {
+            let prefix = format!("{}. ", i + 1);
+            if line.starts_with(&prefix) {
+                line[prefix.len()..].to_string()
+            } else {
+                line.to_string()
+            }
+        })
+        .collect::<Vec<_>>()
+        .join("\n")
+}
+
 fn format_list(text: &str, prefix: &str) -> String {
     text.lines()
         .map(|line| {
@@ -189,7 +276,6 @@ fn format_list(text: &str, prefix: &str) -> String {
         .join("\n")
 }
 
-/// Format text as a numbered list
 fn format_numbered_list(text: &str) -> String {
     text.lines()
         .enumerate()

@@ -38,6 +38,8 @@ impl IconCache {
 
         bundle!("show-symbolic", 18);
         bundle!("hide-symbolic", 18);
+        bundle!("edit-symbolic", 18);
+        bundle!("markdown-symbolic", 18);
 
         bundle!("helperbar/bold-symbolic", 18);
         bundle!("helperbar/bulleted-list-symbolic", 18);
@@ -49,9 +51,36 @@ impl IconCache {
         bundle!("helperbar/link-symbolic", 18);
         bundle!("helperbar/numbered-list-symbolic", 18);
         bundle!("helperbar/rule-symbolic", 18);
+        bundle!("helperbar/pdf-symbolic", 18);
 
         Self { cache }
     }
+}
+
+pub fn get_icon(name: &'static str, size: u16) -> icon::Icon {
+    let mut icon_cache = ICON_CACHE.get().unwrap().lock().unwrap();
+    let handle = icon_cache
+        .cache
+        .entry(IconCacheKey {
+            name: Cow::Borrowed(name),
+            size,
+        })
+        .or_insert_with(|| icon::from_name(name).size(size).handle())
+        .clone();
+    icon::icon(handle).size(size)
+}
+
+pub fn get_icon_owned(name: String, size: u16) -> icon::Icon {
+    let mut icon_cache = ICON_CACHE.get().unwrap().lock().unwrap();
+    let handle = icon_cache
+        .cache
+        .entry(IconCacheKey {
+            name: Cow::Owned(name.clone()),
+            size,
+        })
+        .or_insert_with(|| icon::from_name(name).size(size).handle())
+        .clone();
+    icon::icon(handle).size(size)
 }
 
 pub fn get_handle(name: &'static str, size: u16) -> icon::Handle {

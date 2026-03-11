@@ -12,3 +12,8 @@ debian/*
 !debian/install
 !debian/rules
 !debian/source
+
+# Flatpak Support
+.flatpak-builder
+flatpak-cargo-generator.py
+repo
