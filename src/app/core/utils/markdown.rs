@@ -75,6 +75,7 @@ impl AppModel {
                 .perform(text_editor::Action::Select(text_editor::Motion::Right));
         }
 
+        editor.push_history();
         editor.is_dirty = true;
 
         Task::none()
