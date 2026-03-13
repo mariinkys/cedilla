@@ -21,11 +21,6 @@
  </a>-->
  </div>
 
-## Note
-
-This is a WIP project that will be released, eventually.
-
-
 ## Install
 
 To install your COSMIC application, you will need [just](https://github.com/casey/just), if you're on Pop!\_OS, you can install it with the following command:

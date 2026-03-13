@@ -62,14 +62,24 @@
     <screenshot type="default">
       <image>
         https://raw.githubusercontent.com/mariinkys/cedilla/main/resources/screenshots/main-light.png</image>
-      <caption>Main Page (Light)</caption>
+      <caption xml:lang="en">Main Page (Light)</caption>
       <caption xml:lang="cs">Hlavní stránka (Světlý režim)</caption>
     </screenshot>
     <screenshot>
       <image>
         https://raw.githubusercontent.com/mariinkys/cedilla/main/resources/screenshots/main-dark.png</image>
-      <caption>Main Page (Dark)</caption>
+      <caption xml:lang="en">Main Page (Dark)</caption>
       <caption xml:lang="cs">Hlavní stránka (Tmavý režim)</caption>
+    </screenshot>
+    <screenshot>
+      <image>
+        https://raw.githubusercontent.com/mariinkys/cedilla/main/resources/screenshots/other-light.png</image>
+      <caption xml:lang="en">Features Showcase (Light)</caption>
+    </screenshot>
+    <screenshot>
+      <image>
+        https://raw.githubusercontent.com/mariinkys/cedilla/main/resources/screenshots/other-dark.png</image>
+      <caption xml:lang="en">Features Showcase (Dark)</caption>
     </screenshot>
   </screenshots>
 

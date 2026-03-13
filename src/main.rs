@@ -24,7 +24,7 @@ fn main() -> cosmic::iced::Result {
                 .min_height(420.0)
                 .min_width(650.0),
         )
-        .size(cosmic::iced::Size::new(1200.0, 800.0))
+        .size(cosmic::iced::Size::new(1000.0, 700.0))
         .is_daemon(false)
         .exit_on_close(false);
 
