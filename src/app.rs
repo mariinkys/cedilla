@@ -327,7 +327,7 @@ impl cosmic::Application for AppModel {
 
     /// Elements to pack at the start of the header bar.
     fn header_start(&self) -> Vec<Element<'_, Self::Message>> {
-        vec![app_menu::menu_bar(&self.core, &self.key_binds)]
+        vec![app_menu::menu_bar(&self.key_binds)]
     }
 
     /// Elements to pack at the end of the header bar.
