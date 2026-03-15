@@ -5,6 +5,15 @@ use cosmic::dialog::{ashpd::desktop::file_chooser::SelectedFiles, file_chooser::
 use std::{path::PathBuf, sync::Arc};
 
 pub async fn load_file(path: PathBuf) -> Result<(PathBuf, Arc<String>), anywho::Error> {
+    let path = path.to_str().and_then(|s| {
+        let url_str = if s.starts_with("file://") {
+            s.to_string()
+        } else {
+            format!("file://{}", s)
+        };
+        url::Url::parse(&url_str).ok()?.to_file_path().ok()
+    }).unwrap_or(path);
+
     let contents = tokio::fs::read_to_string(&path)
         .await
         .map(Arc::new)
