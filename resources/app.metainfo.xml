@@ -63,25 +63,25 @@
     <screenshot type="default">
       <image>
         https://raw.githubusercontent.com/mariinkys/cedilla/main/resources/screenshots/main-light.png</image>
-      <caption xml:lang="en">Main Page (Light)</caption>
+      <caption>Main Page (Light)</caption>
       <caption xml:lang="cs">Hlavní stránka (Světlý režim)</caption>
     </screenshot>
     <screenshot>
       <image>
         https://raw.githubusercontent.com/mariinkys/cedilla/main/resources/screenshots/main-dark.png</image>
-      <caption xml:lang="en">Main Page (Dark)</caption>
+      <caption>Main Page (Dark)</caption>
       <caption xml:lang="cs">Hlavní stránka (Tmavý režim)</caption>
     </screenshot>
     <screenshot>
       <image>
         https://raw.githubusercontent.com/mariinkys/cedilla/main/resources/screenshots/other-light.png</image>
-      <caption xml:lang="en">Features Showcase (Light)</caption>
+      <caption>Features Showcase (Light)</caption>
       <caption xml:lang="cs">Ukázka funkcí (Světlý režim)</caption>
     </screenshot>
     <screenshot>
       <image>
         https://raw.githubusercontent.com/mariinkys/cedilla/main/resources/screenshots/other-dark.png</image>
-      <caption xml:lang="en">Features Showcase (Dark)</caption>
+      <caption>Features Showcase (Dark)</caption>
       <caption xml:lang="cs">Ukázka funkcí (Tmavý režim)</caption>
     </screenshot>
   </screenshots>
@@ -129,8 +129,10 @@
   <releases>
     <release version="0.1.2" date="2026-03-15">
         <description>
-            <p>Fixed issue that prevented the config from getting saved on COSMIC (breaking the app)</p>
-            <p>Fixed issue with paths and filenames with non-ASCII characters and spaces</p>
+            <p
+                >Fixed issue that prevented the config from getting saved on COSMIC (breaking the app)</p>
+            <p
+                >Fixed issue with paths and filenames with non-ASCII characters and spaces</p>
             <p>Added turkish translations</p>
             <p>Fixed issue that prevented the menubar from working on GNOME</p>
         </description>
@@ -140,7 +142,8 @@
             <p>Changed the default window size</p>
             <p>Improved handling of list elements</p>
             <p>Added permissions warning to Move Vault feature</p>
-            <p>Allow opening vault location in File Explorer from Settings page</p>
+            <p
+                >Allow opening vault location in File Explorer from Settings page</p>
         </description>
     </release>
     <release version="0.1.0" date="2026-03-13">
