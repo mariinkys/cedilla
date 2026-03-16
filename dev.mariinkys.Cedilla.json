@@ -20,7 +20,10 @@
     "--talk-name=com.system76.CosmicSettingsDaemon"
   ],
   "build-options": {
-    "append-path": "/usr/lib/sdk/rust-stable/bin"
+    "append-path": "/usr/lib/sdk/rust-stable/bin",
+    "env": {
+      "AWS_LC_SYS_NO_JITTER_ENTROPY": "1"
+    }
   },
   "modules": [
     {
