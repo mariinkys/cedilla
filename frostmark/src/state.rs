@@ -3,7 +3,10 @@
 // https://github.com/Mrmayman/frostmark
 //
 
-use std::collections::{HashMap, HashSet};
+use std::{
+    cell::RefCell,
+    collections::{HashMap, HashSet},
+};
 
 use html5ever::{ParseOpts, tendril::TendrilSink};
 use markup5ever_rcdom::RcDom;
@@ -33,6 +36,7 @@ pub struct MarkState {
 
     pub(crate) selection_state: HashMap<String, widgets::text_editor::Content>,
     pub(crate) dropdown_state: HashMap<usize, bool>,
+    pub(crate) typst_cache: RefCell<HashMap<String, cosmic::iced::widget::image::Handle>>,
 }
 
 impl MarkState {
@@ -68,6 +72,7 @@ impl MarkState {
             dom,
             selection_state,
             dropdown_state,
+            typst_cache: RefCell::new(HashMap::new()),
         }
     }
 

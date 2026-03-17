@@ -19,6 +19,7 @@ use super::structs::ChildData;
 
 mod ruby;
 mod table;
+mod typst;
 
 // Add everything to one place
 pub trait ValidTheme:
@@ -170,7 +171,14 @@ impl<'a, M: Clone + 'static, T: ValidTheme + 'a> MarkWidget<'a, M, T> {
                 self.current_code_language = get_attr(&attrs, "class")
                     .and_then(|c| c.strip_prefix("language-"))
                     .map(str::to_owned);
-                let result = self.render_children(node, data.insert(ChildDataFlags::MONOSPACE));
+
+                let result = if self.current_code_language.as_deref() == Some("typst") {
+                    let code = extract_text(node);
+                    self.draw_typst(&code)
+                } else {
+                    self.render_children(node, data.insert(ChildDataFlags::MONOSPACE))
+                };
+
                 self.current_code_language = None;
                 result
             }

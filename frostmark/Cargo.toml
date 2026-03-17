@@ -14,6 +14,10 @@ bitflags = "2.11.0"
 comrak = { version = "0.50", default-features = false, optional = true }
 widgets = { path = "../widgets" }
 
+typst = "0.14.2"
+typst-render = "0.14.2"
+typst-assets = { version = "0.14.2", features = ["fonts"] }
+
 [dev-dependencies]
 tokio.workspace = true
 reqwest.workspace = true

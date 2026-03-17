@@ -9,6 +9,7 @@ mod renderer;
 mod state;
 mod structs;
 mod style;
+mod typst_world;
 mod widgets;
 
 pub use state::MarkState;

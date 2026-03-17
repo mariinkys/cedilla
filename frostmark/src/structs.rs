@@ -534,3 +534,7 @@ pub enum RubyMode {
     /// Ignore ruby annotations entirely
     Ignore,
 }
+
+pub struct TypstResult {
+    pub handle: widget::image::Handle,
+}
