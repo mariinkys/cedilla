@@ -839,13 +839,24 @@ impl AppModel {
                 )
                 .add(
                     widget::settings::item::builder(fl!("selected-font")).control(
-                        widget::dropdown(&self.system_fonts, Some(font_selected), |index| {
-                            if index == 0 {
-                                Message::ConfigInput(ConfigInput::ResetFont)
-                            } else {
-                                Message::ConfigInput(ConfigInput::UpdateFont(index - 1))
-                            }
-                        }),
+                        row![
+                            widget::dropdown(&self.system_fonts, Some(font_selected), |index| {
+                                if index == 0 {
+                                    Message::ConfigInput(ConfigInput::ResetFont)
+                                } else {
+                                    Message::ConfigInput(ConfigInput::UpdateFont(index - 1))
+                                }
+                            }),
+                            widget::tooltip(
+                                widget::icon(icons::get_handle("dialog-information-symbolic", 18)),
+                                container(text(fl!("font-selection-info")))
+                                    .padding(6.)
+                                    .max_width(250.),
+                                tooltip::Position::Left
+                            ),
+                        ]
+                        .align_y(Alignment::Center)
+                        .spacing(cosmic::theme::spacing().space_xxs),
                     ),
                 )
                 .into(),

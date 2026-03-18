@@ -56,6 +56,7 @@ flatpak-permissions = By default, the Flatpak version only has permissions for t
 flatpak-permissions-note = Note, this also affects image loading. Local images will only load if they are in a folder with permissions.
 selected-font = Selected Font
 default-font = Default Font
+font-selection-info = Some fonts will not work, and the app will automatically fall back to the default font (without changing the selected font in the settings). That is not a bug; it is the intended behavior.
 
 <#-- Application MenuBar -->
 file = File
