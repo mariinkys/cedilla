@@ -136,7 +136,7 @@
             <p
                 >Fixed images rendering as a block (not being able to have images one next to another one)</p>
             <p>Improved czech translation</p>
-            <p>Fixed issue that prevented the menubar from working on GNOME</p>
+            <p>Other fixes and improvments</p>
       </description>
     </release>
     <release version="0.1.2" date="2026-03-15">
