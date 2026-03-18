@@ -4,7 +4,7 @@
 <h1 align="center">Cedilla</h1>
 
 ![Flathub Version](https://img.shields.io/flathub/v/dev.mariinkys.Cedilla)
-<!--![Flathub Downloads](https://img.shields.io/flathub/downloads/dev.mariinkys.Cedilla)-->
+![Flathub Downloads](https://img.shields.io/flathub/downloads/dev.mariinkys.Cedilla)
 ![GitHub License](https://img.shields.io/github/license/mariinkys/cedilla)
 ![GitHub Repo stars](https://img.shields.io/github/stars/mariinkys/cedilla)
 
@@ -36,6 +36,12 @@ just build-release
 sudo just install
 ```
 
+## Typst Support
+
+The app has some support for [Typst](https://typst.app/) inside `code` blocks. This has been added specially for math and formulas; other Typst features may not work correctly. (But you're free to try). You can add Typst using `typ` or `typst` as the languge attribut inside a `code` block.
+
+<img src="./resources/screenshots/typst.png" width=750>
+    
 ## Attribution
 
 > "[Pop Icons](http://github.com/pop-os/icon-theme)" by [System76](http://system76.com/) is licensed under [CC-SA-4.0](http://creativecommons.org/licenses/by-sa/4.0/)
