@@ -15,6 +15,7 @@ use cosmic::cosmic_config::Update;
 use cosmic::cosmic_theme::{self, ThemeMode};
 use cosmic::iced::{Alignment, Event, Font, Length, Padding, Subscription, highlighter};
 use cosmic::iced_core::keyboard::{Key, Modifiers};
+use cosmic::iced_core::window;
 use cosmic::iced_widget::{center, column, row, scrollable, tooltip};
 use cosmic::widget::space::horizontal;
 use cosmic::widget::{self, about::About, menu};
@@ -660,6 +661,7 @@ impl cosmic::Application for AppModel {
                 Event::Keyboard(cosmic::iced::keyboard::Event::ModifiersChanged(modifiers)) => {
                     Some(Message::Modifiers(modifiers))
                 }
+                Event::Window(window::Event::CloseRequested) => Some(Message::AppCloseRequested),
                 _ => None,
             }),
             cosmic_config::config_subscription(
