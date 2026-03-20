@@ -119,9 +119,7 @@ impl AppModel {
 
                 if let Some(idx) = editor.search.current_match_index {
                     editor.navigate_to_match(&editor.search.matches[idx].clone());
-                    scroll_to_cursor_task(editor).chain(
-                        widgets::text_editor::focus(text_editor_id()).map(cosmic::action::app),
-                    )
+                    scroll_to_cursor_task(editor)
                 } else {
                     Task::none()
                 }
@@ -130,9 +128,7 @@ impl AppModel {
             SearchAction::NextResult => {
                 if let Some(m) = editor.search.next_match().cloned() {
                     editor.navigate_to_match(&m);
-                    scroll_to_cursor_task(editor).chain(
-                        widgets::text_editor::focus(text_editor_id()).map(cosmic::action::app),
-                    )
+                    scroll_to_cursor_task(editor)
                 } else {
                     Task::none()
                 }
@@ -141,9 +137,7 @@ impl AppModel {
             SearchAction::PrevResult => {
                 if let Some(m) = editor.search.prev_match().cloned() {
                     editor.navigate_to_match(&m);
-                    scroll_to_cursor_task(editor).chain(
-                        widgets::text_editor::focus(text_editor_id()).map(cosmic::action::app),
-                    )
+                    scroll_to_cursor_task(editor)
                 } else {
                     Task::none()
                 }
