@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0
 
-use crate::app::core::editor::{EditorScrollState, EditorState};
+use crate::app::core::editor::{EditorScrollState, EditorSearchState, EditorState};
 use crate::app::core::history::HistoryState;
 use crate::app::core::preview::MarkdownPreview;
 use crate::app::core::utils::{self, CedillaToast};
@@ -49,6 +49,7 @@ impl AppModel {
                 is_dirty: true,
                 history: HistoryState::default(),
                 scroll: EditorScrollState::default(),
+                search: EditorSearchState::default(),
             },
             preview: MarkdownPreview {
                 markstate: MarkState::with_html_and_markdown(""),
@@ -72,6 +73,7 @@ impl AppModel {
                 is_dirty: true,
                 history: HistoryState::default(),
                 scroll: EditorScrollState::default(),
+                search: EditorSearchState::default(),
             },
             preview: MarkdownPreview {
                 markstate: MarkState::with_html_and_markdown(""),
@@ -121,6 +123,7 @@ impl AppModel {
                 is_dirty: true,
                 history: HistoryState::default(),
                 scroll: EditorScrollState::default(),
+                search: EditorSearchState::default(),
             },
             preview: MarkdownPreview {
                 markstate: MarkState::with_html_and_markdown(""),
@@ -225,6 +228,7 @@ impl AppModel {
                         is_dirty: false,
                         history: HistoryState::new_with_content(content.to_string()),
                         scroll: EditorScrollState::default(),
+                        search: EditorSearchState::default(),
                     },
                     preview: MarkdownPreview {
                         markstate,

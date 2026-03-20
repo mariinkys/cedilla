@@ -28,6 +28,8 @@ pub enum MenuAction {
     Undo,
     /// Redo
     Redo,
+    /// Search
+    Search,
 }
 
 impl menu::action::MenuAction for MenuAction {
@@ -45,6 +47,7 @@ impl menu::action::MenuAction for MenuAction {
             MenuAction::TogglePreview => Message::MenuAction(MenuAction::TogglePreview),
             MenuAction::Undo => Message::MenuAction(MenuAction::Undo),
             MenuAction::Redo => Message::MenuAction(MenuAction::Redo),
+            MenuAction::Search => Message::MenuAction(MenuAction::Search),
         }
     }
 }
@@ -72,6 +75,7 @@ pub fn menu_bar<'a>(key_binds: &HashMap<KeyBind, MenuAction>) -> Element<'a, Mes
                 vec![
                     menu::Item::Button(fl!("undo"), None, MenuAction::Undo),
                     menu::Item::Button(fl!("redo"), None, MenuAction::Redo),
+                    menu::Item::Button(fl!("search"), None, MenuAction::Search),
                 ],
             ),
         ),

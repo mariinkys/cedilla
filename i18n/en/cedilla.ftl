@@ -85,3 +85,7 @@ bullet-list = Bulleted List
 numbered-list = Numbered List
 checkbox = Checkbox
 horizontal-rule = Horizontal Rule
+
+<#-- Search -->
+search = Search
+no-results = No Results

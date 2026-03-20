@@ -5,6 +5,7 @@ use crate::app::context_page::ContextPage;
 use crate::app::core::editor::EditorState;
 use crate::app::core::preview::MarkdownPreview;
 use crate::app::core::project::ProjectNode;
+use crate::app::core::utils::search::SearchAction;
 use crate::app::core::utils::{self, CedillaToast, Image};
 use crate::app::dialogs::{DialogPage, DialogState};
 use crate::config::{AppTheme, BoolState, CONFIG_VERSION, CedillaConfig, ConfigInput, ShowState};
@@ -184,6 +185,8 @@ pub enum Message {
     Undo,
     /// Redo requested
     Redo,
+    /// Search related action requested
+    Search(SearchAction),
 
     /// Update the HTML renderer state
     UpdateMarkState(UpdateMsg),
@@ -746,6 +749,7 @@ impl cosmic::Application for AppModel {
             Message::ApplyFormatting(action) => self.handle_apply_formatting(action),
             Message::Undo => self.handle_undo(),
             Message::Redo => self.handle_redo(),
+            Message::Search(action) => self.handle_search(action),
 
             // Preview / Pane
             Message::UpdateMarkState(msg) => self.handle_update_mark_state(msg),
@@ -1026,6 +1030,7 @@ fn cedilla_main_view<'a>(
 
             scrollable(
                 TextEditor::new(&editor.content)
+                    .id(text_editor_id())
                     .highlight_with::<highlighter::Highlighter>(
                         highlighter::Settings {
                             theme: highlighter_theme,
@@ -1041,7 +1046,7 @@ fn cedilla_main_view<'a>(
                     .size(app_config.text_size)
                     .font(font)
                     .padding(0)
-                    .retain_focus_on_external_click(true)
+                    .retain_focus_on_external_click(!editor.search.show_search_box)
                     .on_action(Message::Edit),
             )
             .id(editor_scrollable_id())
@@ -1248,7 +1253,7 @@ fn cedilla_main_view<'a>(
         content_column
     };
 
-    container(content_column)
+    let base: Element<Message> = container(content_column)
         .padding(
             Padding::new(spacing.space_xxs as f32)
                 .left(0.)
@@ -1257,7 +1262,62 @@ fn cedilla_main_view<'a>(
         )
         .width(Length::Fill)
         .height(Length::Fill)
-        .into()
+        .into();
+
+    if !editor.search.show_search_box {
+        base
+    } else {
+        let match_status: String = match editor.search.current_match_index {
+            _ if editor.search.regex_error.is_some() => editor.search.regex_error.clone().unwrap(),
+            Some(i) => format!("{}/{}", i + 1, editor.search.matches.len()),
+            None if editor.search.search_value.is_empty() => String::new(),
+            None => fl!("no-results"),
+        };
+
+        let search_box = container(
+            row![
+                text_input(fl!("search"), &editor.search.search_value)
+                    .id(search_input_id())
+                    .on_focus(Message::Search(SearchAction::FocusSearchField))
+                    .on_input(|v| Message::Search(SearchAction::UpdateSearchValue(v)))
+                    .on_submit(|_v| Message::Search(SearchAction::NextResult))
+                    .width(Length::Fixed(200.)),
+                button::icon(icons::get_handle("go-up-symbolic", 16))
+                    .on_press(Message::Search(SearchAction::PrevResult))
+                    .class(theme::Button::Icon),
+                button::icon(icons::get_handle("go-down-symbolic", 16))
+                    .on_press(Message::Search(SearchAction::NextResult))
+                    .class(theme::Button::Icon),
+                button::icon(icons::get_handle("regex-symbolic", 18))
+                    .on_press(Message::Search(SearchAction::ToggleRegex))
+                    .class(if editor.search.use_regex {
+                        theme::Button::Suggested
+                    } else {
+                        theme::Button::Standard
+                    }),
+                text(match_status).size(12),
+                button::icon(icons::get_handle("window-close-symbolic", 16))
+                    .on_press(Message::Search(SearchAction::ToggleSearch))
+                    .class(theme::Button::Icon),
+            ]
+            .spacing(spacing.space_xxs)
+            .align_y(Alignment::Center)
+            .padding(spacing.space_xs),
+        )
+        .class(theme::Container::Background)
+        .width(Length::Shrink);
+
+        let overlay = container(search_box)
+            .align_right(Length::Fill)
+            .align_top(Length::Fill)
+            .padding(
+                Padding::new(0.)
+                    .top(spacing.space_xs as f32)
+                    .right(spacing.space_s as f32),
+            );
+
+        cosmic::iced_widget::stack!(base, overlay).into()
+    }
 }
 
 /// Returns the text editor scrollable Id
@@ -1268,6 +1328,16 @@ fn editor_scrollable_id() -> widget::Id {
 /// Returns the cotnent preview scrollable Id
 fn preview_scrollable_id() -> widget::Id {
     widget::Id::new("preview_scroll")
+}
+
+/// Returns the text editor id
+fn text_editor_id() -> widgets::text_editor::Id {
+    widgets::text_editor::Id::from(widget::Id::new("text_editor"))
+}
+
+/// Returns the search input id
+pub fn search_input_id() -> widget::Id {
+    widget::Id::new("search_input")
 }
 
 /// Creates the default panes for the app

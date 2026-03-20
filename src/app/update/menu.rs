@@ -45,6 +45,7 @@ impl AppModel {
             }
             MenuAction::Undo => self.handle_undo(),
             MenuAction::Redo => self.handle_redo(),
+            MenuAction::Search => self.handle_search(utils::search::SearchAction::ToggleSearch),
         }
     }
 }

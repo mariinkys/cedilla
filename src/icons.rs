@@ -41,6 +41,7 @@ impl IconCache {
         bundle!("edit-symbolic", 18);
         bundle!("markdown-symbolic", 18);
         bundle!("dialog-information-symbolic", 18);
+        bundle!("regex-symbolic", 18);
 
         bundle!("helperbar/bold-symbolic", 18);
         bundle!("helperbar/bulleted-list-symbolic", 18);

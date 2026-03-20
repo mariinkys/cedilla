@@ -1008,9 +1008,11 @@ where
 
         let translation = text_bounds.position() - Point::ORIGIN;
 
-        if let Some(focus) = state.focus.as_ref() {
-            match internal.editor.selection() {
-                Selection::Caret(position) if focus.is_cursor_visible() => {
+        match internal.editor.selection() {
+            Selection::Caret(position) => {
+                if let Some(focus) = state.focus.as_ref()
+                    && focus.is_cursor_visible()
+                {
                     let cursor = Rectangle::new(
                         position + translation,
                         Size::new(
@@ -1033,21 +1035,20 @@ where
                         );
                     }
                 }
-                Selection::Range(ranges) => {
-                    for range in ranges
-                        .into_iter()
-                        .filter_map(|range| text_bounds.intersection(&(range + translation)))
-                    {
-                        renderer.fill_quad(
-                            renderer::Quad {
-                                bounds: range,
-                                ..renderer::Quad::default()
-                            },
-                            style.selection,
-                        );
-                    }
+            }
+            Selection::Range(ranges) => {
+                for range in ranges
+                    .into_iter()
+                    .filter_map(|range| text_bounds.intersection(&(range + translation)))
+                {
+                    renderer.fill_quad(
+                        renderer::Quad {
+                            bounds: range,
+                            ..renderer::Quad::default()
+                        },
+                        style.selection,
+                    );
                 }
-                Selection::Caret(_) => {}
             }
         }
     }

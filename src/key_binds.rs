@@ -32,6 +32,7 @@ pub fn key_binds() -> HashMap<KeyBind, MenuAction> {
 
     bind!([Ctrl], Key::Character("z".into()), Undo);
     bind!([Ctrl, Shift], Key::Character("z".into()), Redo);
+    bind!([Ctrl], Key::Character("f".into()), Search);
 
     bind!([Ctrl], Key::Character(",".into()), Settings);
     bind!([Ctrl], Key::Character("i".into()), About);

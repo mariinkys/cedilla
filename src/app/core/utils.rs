@@ -4,6 +4,7 @@ pub mod files;
 pub mod images;
 pub mod markdown;
 pub mod pdf;
+pub mod search;
 mod toast;
 
 pub use images::Image;
