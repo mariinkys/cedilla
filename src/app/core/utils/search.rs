@@ -20,7 +20,6 @@ pub enum SearchAction {
 #[derive(Debug, Clone)]
 pub struct SearchMatch {
     pub line: usize,
-    /// Char offset, used for display ("3:5")
     pub col_start: usize,
     pub col_end: usize,
 }
@@ -76,13 +75,10 @@ impl EditorSearchState {
                 let line_idx = (line_number as usize).saturating_sub(1);
 
                 let _ = matcher.find_iter(line_text.as_bytes(), |m: Match| {
-                    let col_start = line_text[..m.start()].chars().count();
-                    let col_end = col_start + line_text[m.start()..m.end()].chars().count();
-
                     new_matches.push(SearchMatch {
                         line: line_idx,
-                        col_start,
-                        col_end,
+                        col_start: m.start(),
+                        col_end: m.end(),
                     });
 
                     true // keep iterating
