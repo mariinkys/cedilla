@@ -1,6 +1,6 @@
 [package]
 name = "cedilla"
-version = "0.1.3"
+version = "0.1.4"
 edition = "2024"
 license = "GPL-3.0"
 description = "A markdown text editor for the COSMIC™ desktop"
@@ -73,7 +73,7 @@ reqwest = { version = "0.13.2", default-features = false, features = ["rustls"] 
 url = "2.5.8"
 base64 = "0.22.1"
 regex = "1.12.3"
-pulldown-cmark = "0.13.1"
+pulldown-cmark = "0.13.2"
 dissimilar = "1.0.11"
 gotenberg_pdf = { git = "https://github.com/mariinkys/gotenberg_pdf" }
 font-kit = "0.14.3"

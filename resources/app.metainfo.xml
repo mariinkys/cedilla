@@ -128,6 +128,15 @@
   </keywords>
 
   <releases>
+    <release version="0.1.4" date="2026-03-23">
+        <description>
+            <p>Added a Search feature</p>
+            <p>Added a Formula button to the headerbar</p>
+            <p>Allow the app to be closed using Super+Q in COSMIC</p>
+            <p>Improved turikish translation</p>
+            <p>Other fixes and improvments</p>
+        </description>
+    </release>
     <release version="0.1.3" date="2026-03-19">
       <description>
             <p>Added Typst support to codeblocks</p>
