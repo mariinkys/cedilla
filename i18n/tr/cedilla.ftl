@@ -85,3 +85,7 @@ bullet-list = Madde İşaretli Liste
 numbered-list = Numaralandırılmış Liste 
 checkbox = Onay Kutusu 
 horizontal-rule = Yatay Çizgi 
+
+<#-- Search -->
+search = Ara
+no-results = Bulunamadı
