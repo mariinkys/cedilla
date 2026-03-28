@@ -29,6 +29,8 @@ pub struct EditorScrollState {
     pub last_preview_viewport: Option<cosmic::iced_widget::scrollable::Viewport>,
     pub pending_editor_scrolls: u32,
     pub pending_preview_scrolls: u32,
+    // we need this becasue the viewport get's calculated before images load-in then there's a weird jump in the preview
+    pub last_preview_content_height: f32,
 }
 
 #[derive(Default)]

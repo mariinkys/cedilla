@@ -127,11 +127,21 @@ impl AppModel {
         }
 
         if is_preview {
+            let prev_height = editor.scroll.last_preview_content_height;
+            let new_height = viewport.content_bounds().height;
+
             editor.scroll.last_preview_viewport = Some(viewport);
+            editor.scroll.last_preview_content_height = new_height;
 
             // programmatic scroll we fired, consume it and skip sync
             if editor.scroll.pending_preview_scrolls > 0 {
                 editor.scroll.pending_preview_scrolls -= 1;
+                return Task::none();
+            }
+
+            // Content height changed, this is a reflow from images/fonts loading,
+            // not a user scroll. Ignore it to avoid snapping the editor.
+            if (prev_height - new_height).abs() > 1.0 {
                 return Task::none();
             }
 
