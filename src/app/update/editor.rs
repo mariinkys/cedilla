@@ -3,7 +3,12 @@
 use crate::app::core::editor::{EditorSearchState, EditorState};
 use crate::app::core::utils::search::SearchAction;
 use crate::app::core::utils::{self};
-use crate::app::{AppModel, Message, State, editor_scrollable_id, search_input_id, text_editor_id};
+use crate::app::{
+    AppModel, Message, State, editor_scrollable_id, preview_scrollable_id, search_input_id,
+    text_editor_id,
+};
+use crate::config::BoolState;
+use cosmic::iced_widget::scrollable::scroll_to;
 use cosmic::prelude::*;
 use widgets::text_editor;
 
@@ -34,14 +39,19 @@ impl AppModel {
             editor.push_history((cursor_before.line, cursor_before.column));
         }
 
-        let snap_task = snap_task(editor, was_edit);
+        let sync_preview = self.config.scrollbar_sync == BoolState::Yes;
+        let cursor_task = if was_edit {
+            ensure_cursor_visible(editor, sync_preview)
+        } else {
+            Task::none()
+        };
 
         utils::images::download_images(
             &mut preview.markstate,
             &mut preview.images_in_progress,
             &editor.path,
         )
-        .chain(snap_task)
+        .chain(cursor_task)
     }
 
     pub fn handle_apply_formatting(
@@ -90,6 +100,8 @@ impl AppModel {
             return Task::none();
         };
 
+        let sync_preview = self.config.scrollbar_sync == BoolState::Yes;
+
         match action {
             SearchAction::ToggleSearch => {
                 editor.search.show_search_box = !editor.search.show_search_box;
@@ -97,7 +109,7 @@ impl AppModel {
                 if !editor.search.show_search_box {
                     editor.search = EditorSearchState::default();
                     widgets::text_editor::focus(text_editor_id())
-                        .chain(scroll_to_cursor_task(editor))
+                        .chain(ensure_cursor_visible(editor, sync_preview))
                 } else {
                     cosmic::widget::text_input::focus(search_input_id())
                 }
@@ -109,7 +121,7 @@ impl AppModel {
 
                 if let Some(idx) = editor.search.current_match_index {
                     editor.navigate_to_match(&editor.search.matches[idx].clone());
-                    scroll_to_cursor_task(editor)
+                    ensure_cursor_visible(editor, sync_preview)
                 } else {
                     Task::none()
                 }
@@ -121,7 +133,7 @@ impl AppModel {
 
                 if let Some(idx) = editor.search.current_match_index {
                     editor.navigate_to_match(&editor.search.matches[idx].clone());
-                    scroll_to_cursor_task(editor)
+                    ensure_cursor_visible(editor, sync_preview)
                 } else {
                     Task::none()
                 }
@@ -130,7 +142,7 @@ impl AppModel {
             SearchAction::NextResult => {
                 if let Some(m) = editor.search.next_match().cloned() {
                     editor.navigate_to_match(&m);
-                    scroll_to_cursor_task(editor)
+                    ensure_cursor_visible(editor, sync_preview)
                 } else {
                     Task::none()
                 }
@@ -139,7 +151,7 @@ impl AppModel {
             SearchAction::PrevResult => {
                 if let Some(m) = editor.search.prev_match().cloned() {
                     editor.navigate_to_match(&m);
-                    scroll_to_cursor_task(editor)
+                    ensure_cursor_visible(editor, sync_preview)
                 } else {
                     Task::none()
                 }
@@ -150,66 +162,61 @@ impl AppModel {
     }
 }
 
-fn snap_task(editor: &mut EditorState, was_edit: bool) -> Task<cosmic::Action<Message>> {
-    if was_edit {
-        let total_lines = editor.content.line_count();
-        let cursor_line = editor.content.cursor().position.line;
-
-        if cursor_line + 1 >= total_lines {
-            if let Some(vp) = editor.scroll.last_editor_viewport {
-                let content_height = vp.content_bounds().height;
-                let viewport_height = vp.bounds().height;
-                let real_line_height = content_height / total_lines.max(1) as f32;
-                let cursor_y = cursor_line as f32 * real_line_height;
-
-                if cursor_y + real_line_height * 3.0
-                    > editor.scroll.last_editor_scroll_y + viewport_height
-                {
-                    let new_y = (cursor_y + real_line_height * 3.0 - viewport_height)
-                        .max(editor.scroll.last_editor_scroll_y);
-                    editor.scroll.last_editor_scroll_y = new_y;
-                    cosmic::iced_widget::scrollable::scroll_to(
-                        editor_scrollable_id(),
-                        cosmic::iced_widget::scrollable::AbsoluteOffset {
-                            x: Some(0.0),
-                            y: Some(new_y),
-                        },
-                    )
-                    .map(cosmic::action::app)
-                } else {
-                    Task::none()
-                }
-            } else {
-                Task::none()
-            }
-        } else {
-            Task::none()
-        }
-    } else {
-        Task::none()
-    }
-}
-
-fn scroll_to_cursor_task(editor: &EditorState) -> Task<cosmic::Action<Message>> {
-    let Some(vp) = editor.scroll.last_editor_viewport else {
+/// Scrolls the editor to keep the cursor visible.
+fn ensure_cursor_visible(
+    editor: &mut EditorState,
+    sync_preview: bool,
+) -> Task<cosmic::Action<Message>> {
+    let Some(editor_vp) = editor.scroll.last_editor_viewport else {
         return Task::none();
     };
 
-    let total_lines = editor.content.line_count();
+    let total_lines = editor.content.line_count().max(1);
     let cursor_line = editor.content.cursor().position.line;
-    let content_height = vp.content_bounds().height;
-    let viewport_height = vp.bounds().height;
-    let real_line_height = content_height / total_lines.max(1) as f32;
-    let cursor_y = cursor_line as f32 * real_line_height;
+    let content_height = editor_vp.content_bounds().height;
+    let viewport_height = editor_vp.bounds().height;
+    let line_height = content_height / total_lines as f32;
+    let cursor_top = cursor_line as f32 * line_height;
+    let cursor_bottom = cursor_top + line_height;
+    let scroll_y = editor_vp.absolute_offset().y;
+    let padding = line_height * 3.0;
 
-    let new_y = (cursor_y - viewport_height / 2.0).max(0.0);
+    let new_editor_y = if cursor_top < scroll_y + padding {
+        // cursor above visible area
+        (cursor_top - padding).max(0.0)
+    } else if cursor_bottom > scroll_y + viewport_height - padding {
+        // cursor below visible area
+        cursor_bottom + padding - viewport_height
+    } else {
+        // already visible, nothing to do
+        return Task::none();
+    };
 
-    cosmic::iced_widget::scrollable::scroll_to(
-        editor_scrollable_id(),
-        cosmic::iced_widget::scrollable::AbsoluteOffset {
-            x: Some(0.0),
-            y: Some(new_y),
-        },
-    )
-    .map(cosmic::action::app)
+    // scroll editor, marking it as programmatic so it isn't re-synced via on_scroll
+    editor.scroll.pending_editor_scrolls += 1;
+    let editor_task = scroll_to(editor_scrollable_id(), utils::scroll::abs(new_editor_y))
+        .map(cosmic::action::app);
+
+    // if sync is active, also scroll the preview proportionally
+    if let Some(preview_vp) = editor.scroll.last_preview_viewport
+        && sync_preview
+    {
+        let editor_scrollable = (content_height - viewport_height).max(0.0);
+        let rel = if editor_scrollable > 0.0 {
+            new_editor_y / editor_scrollable
+        } else {
+            0.0
+        };
+        let preview_scrollable =
+            (preview_vp.content_bounds().height - preview_vp.bounds().height).max(0.0);
+        let new_preview_y = (rel * preview_scrollable).max(0.0);
+
+        editor.scroll.pending_preview_scrolls += 1;
+        let preview_task = scroll_to(preview_scrollable_id(), utils::scroll::abs(new_preview_y))
+            .map(cosmic::action::app);
+
+        return editor_task.chain(preview_task);
+    }
+
+    editor_task
 }

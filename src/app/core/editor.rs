@@ -22,12 +22,15 @@ pub struct EditorState {
     pub search: EditorSearchState,
 }
 
+/// Allows us to correctly follow the cursor with the scrollbar
 #[derive(Default)]
 pub struct EditorScrollState {
-    /// Allows us to correctly follow the cursor with the scrollbar
     pub last_editor_viewport: Option<cosmic::iced_widget::scrollable::Viewport>,
-    /// Allows us to correctly follow the cursor with the scrollbar
-    pub last_editor_scroll_y: f32,
+    pub last_preview_viewport: Option<cosmic::iced_widget::scrollable::Viewport>,
+    pub pending_editor_scrolls: u32,
+    pub pending_preview_scrolls: u32,
+    // we need this becasue the viewport get's calculated before images load-in then there's a weird jump in the preview
+    pub last_preview_content_height: f32,
 }
 
 #[derive(Default)]

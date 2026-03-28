@@ -132,20 +132,30 @@ impl<'a, M: Clone + 'static, T: ValidTheme + 'a> MarkWidget<'a, M, T> {
         }
 
         let e = match name.as_str() {
-            "summary" | "kbd" | "span" | "html" | "body" | "p" | "div" | "thead" | "tbody"
-            | "tfoot" => self.render_children(node, data),
+            "summary" | "kbd" | "span" | "html" | "body" | "div" | "thead" | "tbody" | "tfoot" => {
+                self.render_children(node, data)
+            }
             "center" => {
                 data.alignment = Some(ChildAlignment::Center);
                 self.render_children(node, data)
             }
-            "pre" => self.render_children(node, data.insert(ChildDataFlags::KEEP_WHITESPACE)),
+            "pre" => widget::column![
+                self.render_children(node, data.insert(ChildDataFlags::KEEP_WHITESPACE))
+                    .render()
+            ]
+            .padding(Padding::default().top(8.0).bottom(8.0))
+            .into(),
 
-            "h1" => self.render_children(node, data.heading(1)),
-            "h2" => self.render_children(node, data.heading(2)),
-            "h3" => self.render_children(node, data.heading(3)),
-            "h4" => self.render_children(node, data.heading(4)),
-            "h5" => self.render_children(node, data.heading(5)),
-            "h6" => self.render_children(node, data.heading(6)),
+            "p" => widget::column![self.render_children(node, data).render()]
+                .padding(Padding::default().top(4.0).bottom(4.0))
+                .into(),
+
+            "h1" => padded_heading(self.render_children(node, data.heading(1)), 10.0),
+            "h2" => padded_heading(self.render_children(node, data.heading(2)), 8.0),
+            "h3" => padded_heading(self.render_children(node, data.heading(3)), 6.0),
+            "h4" => padded_heading(self.render_children(node, data.heading(4)), 4.0),
+            "h5" => padded_heading(self.render_children(node, data.heading(5)), 3.0),
+            "h6" => padded_heading(self.render_children(node, data.heading(6)), 3.0),
             "sub" => self.render_children(node, data.heading(7)),
             "sup" => RenderedSpan::Spans(vec![
                 widget::span(to_superscript(&extract_text(node))).size(self.text_size),
@@ -517,7 +527,7 @@ impl<'a, M: Clone + 'static, T: ValidTheme + 'a> MarkWidget<'a, M, T> {
                     .filter(|n| !n.is_empty())
                     .map(RenderedSpan::render),
             )
-            .spacing(self.paragraph_spacing.unwrap_or(5.0))
+            .spacing(self.paragraph_spacing.unwrap_or(10.0))
             .into()
         }
     }
@@ -537,7 +547,7 @@ impl<'a, M: Clone + 'static, T: ValidTheme + 'a> MarkWidget<'a, M, T> {
             let editor = TextEditor::new(state)
                 .is_code_block(true)
                 .size(size)
-                .padding(5)
+                .padding(20)
                 .font(self.font_mono)
                 .on_action(on_action);
 
@@ -645,6 +655,16 @@ impl<'a, M: Clone + 'static, T: ValidTheme + 'a> From<MarkWidget<'a, M, T>> for 
         let node = &value.state.dom.document;
         value.traverse_node(node, ChildData::default()).render()
     }
+}
+
+/// Adds vertical breathing room to a heading
+fn padded_heading<'a, M: Clone + 'static, T: ValidTheme + 'a>(
+    inner: RenderedSpan<'a, M, T>,
+    padding: f32,
+) -> RenderedSpan<'a, M, T> {
+    widget::column![inner.render()]
+        .padding(Padding::default().top(padding).bottom(padding))
+        .into()
 }
 
 fn clean_whitespace(input: &str) -> String {
