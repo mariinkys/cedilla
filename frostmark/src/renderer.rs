@@ -56,7 +56,7 @@ impl<'a, M: Clone + 'static, T: ValidTheme + 'a> MarkWidget<'a, M, T> {
                     1 => 1.8,
                     2 => 1.5,
                     3 => 1.25,
-                    4 => 1.15,
+                    4 => 1.0,
                     5 => 0.875,
                     6 => 0.75,
                     7 => 0.625,
@@ -84,13 +84,13 @@ impl<'a, M: Clone + 'static, T: ValidTheme + 'a> MarkWidget<'a, M, T> {
                             let mut f = self.font;
 
                             let heading_weight = match data.heading_weight {
-                                1 => cosmic::iced::font::Weight::Black,
-                                2 => cosmic::iced::font::Weight::Bold,
-                                3 => cosmic::iced::font::Weight::Semibold,
+                                1 => cosmic::iced::font::Weight::Semibold,
+                                2 => cosmic::iced::font::Weight::Medium,
+                                3 => cosmic::iced::font::Weight::Medium,
                                 4 => cosmic::iced::font::Weight::Medium,
-                                5 => cosmic::iced::font::Weight::Normal,
-                                6 => cosmic::iced::font::Weight::Light,
-                                _ => f.weight,
+                                5 => cosmic::iced::font::Weight::Medium,
+                                6 => cosmic::iced::font::Weight::Medium,
+                                _ => self.font.weight,
                             };
 
                             if data.flags.contains(ChildDataFlags::BOLD) {
