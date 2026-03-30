@@ -53,6 +53,7 @@ impl AppModel {
                 history: HistoryState::default(),
                 scroll: EditorScrollState::default(),
                 search: EditorSearchState::default(),
+                just_saved: false,
             },
             preview: MarkdownPreview {
                 markstate: MarkState::with_html_and_markdown(""),
@@ -83,6 +84,7 @@ impl AppModel {
                     ..EditorScrollState::default()
                 },
                 search: EditorSearchState::default(),
+                just_saved: false,
             },
             preview: MarkdownPreview {
                 markstate: MarkState::with_html_and_markdown(""),
@@ -145,6 +147,7 @@ impl AppModel {
                     ..EditorScrollState::default()
                 },
                 search: EditorSearchState::default(),
+                just_saved: false,
             },
             preview: MarkdownPreview {
                 markstate: MarkState::with_html_and_markdown(""),
@@ -209,6 +212,7 @@ impl AppModel {
         let content = editor.content.text();
         let path = editor.path.clone();
         let vault_path = self.config.vault_path.clone();
+        editor.just_saved = true;
 
         Task::perform(
             async move {
@@ -223,10 +227,7 @@ impl AppModel {
                     },
                 }
             },
-            |res| match res {
-                Some(result) => cosmic::action::app(Message::FileSaved(result)),
-                None => cosmic::action::none(),
-            },
+            |res| cosmic::action::app(Message::FileSaved(res)),
         )
     }
 
@@ -261,6 +262,7 @@ impl AppModel {
                             ..EditorScrollState::default()
                         },
                         search: EditorSearchState::default(),
+                        just_saved: false,
                     },
                     preview: MarkdownPreview {
                         markstate,
@@ -301,20 +303,29 @@ impl AppModel {
 
     pub fn handle_file_saved(
         &mut self,
-        result: Result<PathBuf, anywho::Error>,
+        result: Option<Result<PathBuf, anywho::Error>>,
     ) -> Task<cosmic::Action<Message>> {
-        match result {
-            Ok(new_path) => {
-                let State::Ready { editor, .. } = &mut self.state else {
-                    return Task::none();
-                };
+        if let Some(res) = result {
+            match res {
+                Ok(new_path) => {
+                    let State::Ready { editor, .. } = &mut self.state else {
+                        return Task::none();
+                    };
 
-                editor.path = Some(new_path);
-                editor.is_dirty = false;
+                    editor.path = Some(new_path);
+                    editor.is_dirty = false;
 
-                self.handle_add_toast(CedillaToast::new("File Saved!"))
+                    self.handle_add_toast(CedillaToast::new("File Saved!"))
+                }
+                Err(e) => self.handle_add_toast(CedillaToast::new(e)),
             }
-            Err(e) => self.handle_add_toast(CedillaToast::new(e)),
+        } else {
+            let State::Ready { editor, .. } = &mut self.state else {
+                return Task::none();
+            };
+            editor.just_saved = false;
+
+            Task::none()
         }
     }
 
@@ -332,6 +343,30 @@ impl AppModel {
                 })
             }
         }
+    }
+
+    pub fn handle_external_file_changed(&mut self, path: PathBuf) -> Task<cosmic::Action<Message>> {
+        let State::Ready { editor, .. } = &mut self.state else {
+            return Task::none();
+        };
+
+        if editor.just_saved {
+            editor.just_saved = false;
+            return Task::none();
+        }
+
+        let currently_open = editor.path.as_ref() == Some(&path);
+        let already_shown = self
+            .dialog_pages
+            .iter()
+            .any(|d| matches!(d, crate::app::dialogs::DialogPage::ExternalFileModified(_)));
+
+        if currently_open && !already_shown {
+            self.dialog_pages
+                .push_back(crate::app::dialogs::DialogPage::ExternalFileModified(path));
+        }
+
+        Task::none()
     }
 }
 

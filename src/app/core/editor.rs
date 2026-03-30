@@ -20,6 +20,8 @@ pub struct EditorState {
     pub scroll: EditorScrollState,
     /// Holds the state of the search faetures of the editor
     pub search: EditorSearchState,
+    /// Helper field to not open the external changes dialog when we save a file
+    pub just_saved: bool,
 }
 
 /// Allows us to correctly follow the cursor with the scrollbar
