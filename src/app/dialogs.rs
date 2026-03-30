@@ -24,6 +24,8 @@ pub enum DialogPage {
     MoveNode(cosmic::widget::segmented_button::Entity, Option<PathBuf>),
     /// Dialog for when closing a file with pending changes
     ConfirmCloseFile(DiscardChangesAction),
+    /// Open file was modified externally
+    ExternalFileModified(PathBuf),
 }
 
 impl DialogPage {
@@ -194,6 +196,32 @@ impl DialogPage {
                     ])
                     .spacing(spacing.space_xxs),
                 ),
+            DialogPage::ExternalFileModified(path) => {
+                let file_name = path
+                    .file_name()
+                    .and_then(|n| n.to_str())
+                    .unwrap_or("this file");
+
+                widget::dialog()
+                    .title(fl!("file-changed-externally"))
+                    .primary_action(
+                        widget::button::suggested(fl!("reload"))
+                            .on_press(Message::DialogAction(DialogAction::DialogComplete)),
+                    )
+                    .secondary_action(
+                        widget::button::standard(fl!("keep-my-version"))
+                            .on_press(Message::DialogAction(DialogAction::KeepMyFile)),
+                    )
+                    .control(
+                        widget::column::with_children(vec![
+                            widget::text::body(format!(
+                                "\"{file_name}\" was modified by another program."
+                            ))
+                            .into(),
+                        ])
+                        .spacing(spacing.space_xxs),
+                    )
+            }
         };
 
         Some(dialog.into())
@@ -203,6 +231,8 @@ impl DialogPage {
 /// Represents an Action related to a Dialog
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub enum DialogAction {
+    /// File has been modified externally and user want's to keep it's version of the file
+    KeepMyFile,
     /// Asks to open the [`DialogPage`] for creating a new vault file
     OpenNewVaultFileDialog,
     /// Asks to open the [`DialogPage`] for creating a new vault folder
@@ -233,6 +263,10 @@ impl DialogAction {
         dialog_state: &DialogState,
     ) -> Task<cosmic::Action<Message>> {
         match self {
+            DialogAction::KeepMyFile => {
+                dialog_pages.pop_front();
+                Task::done(cosmic::action::app(Message::SaveFile))
+            }
             DialogAction::OpenNewVaultFileDialog => {
                 dialog_pages.push_back(DialogPage::NewVaultFile(String::new()));
                 widget::text_input::focus(dialog_state.dialog_text_input.clone())
@@ -283,6 +317,12 @@ impl DialogAction {
                                 return Task::done(cosmic::action::app(Message::SaveFile));
                             }
                         },
+
+                        DialogPage::ExternalFileModified(path) => {
+                            return Task::done(cosmic::action::app(Message::DiscardChanges(
+                                DiscardChangesAction::OpenFile(path.clone()),
+                            )));
+                        }
                     }
                 }
                 Task::none()

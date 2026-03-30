@@ -30,7 +30,7 @@ use slotmap::Key as SlotMapKey;
 use std::any::TypeId;
 use std::collections::{HashMap, VecDeque};
 use std::path::{Path, PathBuf};
-use std::sync::Arc;
+use std::sync::{Arc, Mutex};
 use widgets::{TextEditor, text_editor};
 
 pub mod app_menu;
@@ -162,9 +162,11 @@ pub enum Message {
     /// Callback after opening a new file
     OpenFile(Result<(PathBuf, Arc<String>), anywho::Error>),
     /// Callback after saving the current file
-    FileSaved(Result<PathBuf, anywho::Error>),
+    FileSaved(Option<Result<PathBuf, anywho::Error>>),
     /// Callback after asking to close a file discarding changes
     DiscardChanges(DiscardChangesAction),
+    /// Fired when the watcher detects an external change to the open file
+    ExternalFileChanged(PathBuf),
 
     /// Deletes the given node entity of the navbar folder or file
     DeleteNode(cosmic::widget::segmented_button::Entity),
@@ -649,6 +651,11 @@ impl cosmic::Application for AppModel {
         struct ConfigSubscription;
         struct ThemeSubscription;
 
+        let watched_path = match &self.state {
+            State::Ready { editor, .. } => editor.path.clone(),
+            _ => None,
+        };
+
         // Add subscriptions which are always active.
         let subscriptions = vec![
             // Watch for key_bind inputs
@@ -695,6 +702,8 @@ impl cosmic::Application for AppModel {
                 }
                 Message::ConfigInput(ConfigInput::SystemThemeModeChange)
             }),
+            // Watch for external file changes
+            file_watch_subscription(watched_path),
         ];
 
         Subscription::batch(subscriptions)
@@ -736,6 +745,7 @@ impl cosmic::Application for AppModel {
             Message::OpenFile(result) => self.handle_open_file(result),
             Message::FileSaved(result) => self.handle_file_saved(result),
             Message::DiscardChanges(action) => self.handle_discard_changes(action),
+            Message::ExternalFileChanged(path) => self.handle_external_file_changed(path),
 
             // Vault / Node
             Message::DeleteNode(entity) => self.handle_delete_node(entity),
@@ -1318,6 +1328,74 @@ fn cedilla_main_view<'a>(
 
         cosmic::iced_widget::stack!(base, overlay).into()
     }
+}
+
+/// Watches for external changes on the currently open file
+fn file_watch_subscription(path: Option<PathBuf>) -> Subscription<Message> {
+    use cosmic::iced::futures::SinkExt;
+    use cosmic::iced_futures::futures::channel::mpsc;
+    use notify::{EventKind, RecursiveMode, Watcher, recommended_watcher};
+
+    let Some(path) = path else {
+        return Subscription::none();
+    };
+
+    Subscription::run_with(path, |path| {
+        let path_owned = path.clone();
+
+        cosmic::iced_futures::stream::channel(
+            16,
+            move |mut output: mpsc::Sender<Message>| async move {
+                let (tx, rx) = std::sync::mpsc::channel::<PathBuf>();
+                let rx = Arc::new(Mutex::new(rx));
+
+                let mut watcher =
+                    match recommended_watcher(move |res: notify::Result<notify::Event>| {
+                        if let Ok(event) = res {
+                            let is_relevant =
+                                matches!(event.kind, EventKind::Modify(_) | EventKind::Create(_));
+                            if is_relevant {
+                                for p in event.paths {
+                                    let _ = tx.send(p);
+                                }
+                            }
+                        }
+                    }) {
+                        Ok(w) => w,
+                        Err(e) => {
+                            eprintln!("file_watcher: failed to create watcher: {e}");
+                            return;
+                        }
+                    };
+
+                if let Err(e) = watcher.watch(&path_owned, RecursiveMode::NonRecursive) {
+                    eprintln!("file_watcher: failed to watch {path_owned:?}: {e}");
+                    return;
+                }
+
+                let _watcher = watcher;
+
+                loop {
+                    let rx2 = Arc::clone(&rx);
+                    let changed_path =
+                        match tokio::task::spawn_blocking(move || rx2.lock().unwrap().recv()).await
+                        {
+                            Ok(Ok(p)) => p,
+                            _ => return,
+                        };
+
+                    if changed_path == path_owned {
+                        let _ = output
+                            .send(Message::ExternalFileChanged(changed_path))
+                            .await;
+
+                        tokio::time::sleep(std::time::Duration::from_millis(300)).await;
+                        while rx.lock().unwrap().try_recv().is_ok() {}
+                    }
+                }
+            },
+        )
+    })
 }
 
 /// Returns the text editor scrollable Id

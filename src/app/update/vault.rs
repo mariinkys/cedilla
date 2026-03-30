@@ -12,6 +12,10 @@ impl AppModel {
         &mut self,
         entity: segmented_button::Entity,
     ) -> Task<cosmic::Action<Message>> {
+        let State::Ready { editor, .. } = &mut self.state else {
+            return Task::none();
+        };
+
         let Some(node) = self.nav_model.data::<ProjectNode>(entity).cloned() else {
             return Task::none();
         };
@@ -21,12 +25,14 @@ impl AppModel {
             ProjectNode::Folder { path, .. } => path.clone(),
         };
 
+        editor.ignore_next_external_change = true;
         let delete_result = match &node {
             ProjectNode::File { .. } => std::fs::remove_file(&path),
             ProjectNode::Folder { .. } => std::fs::remove_dir_all(&path),
         };
 
         if let Err(e) = delete_result {
+            editor.ignore_next_external_change = false;
             return self.handle_add_toast(CedillaToast::new(e));
         }
 
@@ -47,6 +53,10 @@ impl AppModel {
         entity: segmented_button::Entity,
         new_name: String,
     ) -> Task<cosmic::Action<Message>> {
+        let State::Ready { editor, .. } = &mut self.state else {
+            return Task::none();
+        };
+
         let Some(node) = self.nav_model.data::<ProjectNode>(entity).cloned() else {
             return Task::none();
         };
@@ -82,7 +92,9 @@ impl AppModel {
             )));
         }
 
+        editor.ignore_next_external_change = true;
         if let Err(e) = std::fs::rename(&old_path, &new_path) {
+            editor.ignore_next_external_change = false;
             return self.handle_add_toast(CedillaToast::new(e));
         }
 
@@ -111,6 +123,10 @@ impl AppModel {
         source_entity: segmented_button::Entity,
         target_path: PathBuf,
     ) -> Task<cosmic::Action<Message>> {
+        let State::Ready { editor, .. } = &mut self.state else {
+            return Task::none();
+        };
+
         let source_path = match self.nav_model.data::<ProjectNode>(source_entity) {
             Some(ProjectNode::File { path, .. } | ProjectNode::Folder { path, .. }) => path.clone(),
             None => return Task::none(),
@@ -126,7 +142,9 @@ impl AppModel {
             return Task::none();
         }
 
+        editor.ignore_next_external_change = true;
         if let Err(e) = std::fs::rename(&source_path, &dest) {
+            editor.ignore_next_external_change = false;
             return self.handle_add_toast(CedillaToast::new(e));
         }
 
