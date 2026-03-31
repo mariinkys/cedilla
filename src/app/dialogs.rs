@@ -214,10 +214,8 @@ impl DialogPage {
                     )
                     .control(
                         widget::column::with_children(vec![
-                            widget::text::body(format!(
-                                "\"{file_name}\" was modified by another program."
-                            ))
-                            .into(),
+                            widget::text::body(format!("\"{file_name}\" {}", fl!("modified-text")))
+                                .into(),
                         ])
                         .spacing(spacing.space_xxs),
                     )

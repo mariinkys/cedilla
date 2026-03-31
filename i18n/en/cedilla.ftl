@@ -24,9 +24,10 @@ delete-confirmation = Are you sure you want to delete this file/folder and it's 
 save-changes-closing = Save changes before closing?
 save-warning = You have unsaved changes. If you continue without saving, these changes will be lost.
 discard-changes = Discard Changes
-file-changed-externally = The file has been changed from another application
+file-changed-externally = The file has been changed externally
 reload = Reload File
 keep-my-version = Keep Current Version
+modified-text = was modified by another program.
 
 <#-- Appearance -->
 appearance = Appearance
