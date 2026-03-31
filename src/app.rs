@@ -30,7 +30,7 @@ use slotmap::Key as SlotMapKey;
 use std::any::TypeId;
 use std::collections::{HashMap, VecDeque};
 use std::path::{Path, PathBuf};
-use std::sync::{Arc, Mutex};
+use std::sync::Arc;
 use widgets::{TextEditor, text_editor};
 
 pub mod app_menu;
@@ -1330,10 +1330,10 @@ fn cedilla_main_view<'a>(
     }
 }
 
-/// Watches for external changes on the currently open file
+// Watches for external changes on the currently open file
 fn file_watch_subscription(path: Option<PathBuf>) -> Subscription<Message> {
     use cosmic::iced::futures::SinkExt;
-    use cosmic::iced_futures::futures::channel::mpsc;
+    use cosmic::iced_futures::futures::channel::mpsc as iced_mpsc;
     use notify::{EventKind, RecursiveMode, Watcher, recommended_watcher};
 
     let Some(path) = path else {
@@ -1345,9 +1345,8 @@ fn file_watch_subscription(path: Option<PathBuf>) -> Subscription<Message> {
 
         cosmic::iced_futures::stream::channel(
             16,
-            move |mut output: mpsc::Sender<Message>| async move {
-                let (tx, rx) = std::sync::mpsc::channel::<PathBuf>();
-                let rx = Arc::new(Mutex::new(rx));
+            move |mut output: iced_mpsc::Sender<Message>| async move {
+                let (tx, mut rx) = tokio::sync::mpsc::unbounded_channel::<PathBuf>();
 
                 let mut watcher =
                     match recommended_watcher(move |res: notify::Result<notify::Event>| {
@@ -1373,24 +1372,22 @@ fn file_watch_subscription(path: Option<PathBuf>) -> Subscription<Message> {
                     return;
                 }
 
+                // keep the watcher alive
                 let _watcher = watcher;
 
                 loop {
-                    let rx2 = Arc::clone(&rx);
-                    let changed_path =
-                        match tokio::task::spawn_blocking(move || rx2.lock().unwrap().recv()).await
-                        {
-                            Ok(Ok(p)) => p,
-                            _ => return,
-                        };
+                    let changed_path = match rx.recv().await {
+                        Some(p) => p,
+                        None => return, // channel closed, exit the stream
+                    };
 
                     if changed_path == path_owned {
                         let _ = output
-                            .send(Message::ExternalFileChanged(changed_path))
+                            .send(Message::ExternalFileChanged(changed_path.clone()))
                             .await;
 
                         tokio::time::sleep(std::time::Duration::from_millis(300)).await;
-                        while rx.lock().unwrap().try_recv().is_ok() {}
+                        while rx.try_recv().is_ok() {}
                     }
                 }
             },
