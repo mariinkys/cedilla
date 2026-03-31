@@ -39,6 +39,7 @@
       <li xml:lang="cs">Rychlý a lehký</li>
       <li>Works completely offline</li>
       <li xml:lang="cs">Funguje zcela offline</li>
+      <li>Typst support inside code blocks, for math...</li>
     </ul>
     <p
         >This app has been developed with libcosmic for the COSMIC™ desktop, and issues may occur on
@@ -83,6 +84,16 @@
         https://raw.githubusercontent.com/mariinkys/cedilla/main/resources/screenshots/other-dark.png</image>
       <caption>Features Showcase (Dark)</caption>
       <caption xml:lang="cs">Ukázka funkcí (Tmavý režim)</caption>
+    </screenshot>
+    <screenshot>
+      <image>
+        https://raw.githubusercontent.com/mariinkys/cedilla/main/resources/screenshots/typst-light.png</image>
+      <caption>Typst Support (Light)</caption>
+    </screenshot>
+    <screenshot>
+      <image>
+        https://raw.githubusercontent.com/mariinkys/cedilla/main/resources/screenshots/typst-dark.png</image>
+      <caption>Typst Support (Dark)</caption>
     </screenshot>
   </screenshots>
 
