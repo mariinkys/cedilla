@@ -24,6 +24,10 @@ delete-confirmation = Är du säker på att du vill ta bort den här filen/katal
 save-changes-closing = Spara ändringarna innan du stänger?
 save-warning = Du har ändringar som inte sparats. Om du fortsätter utan att spara kommer dessa ändringar att gå förlorade.
 discard-changes = Kasta bort ändringar
+file-changed-externally = Filen har ändrats externt
+reload = Ladda om fil
+keep-my-version = Beåll nuvarande version
+modified-text = modifierades av ett annat program.
 
 <#-- Utseende -->
 appearance = Utseende
