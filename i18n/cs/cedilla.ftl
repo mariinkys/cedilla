@@ -24,6 +24,10 @@ delete-confirmation = Opravdu chcete smazat tento soubor/složku a jeho obsah?
 save-changes-closing = Uložit změny před zavřením?
 save-warning = Máte neuložené změny. Pokud se rozhodnete pokračovat bez uložení, změny budou ztraceny.
 discard-changes = Zahodit změny
+file-changed-externally = Soubor byl externě změněn
+reload = Znovu načíst
+keep-my-version = Ponechat aktuální verzi
+modified-text = byl změněn jiným programem.
 
 <#-- Appearance -->
 appearance = Vzhled
@@ -51,9 +55,12 @@ gotenberg-url = Nastavit URL serveru Gotenberg
 apply = Použít
 more-info = Více informací
 text-size = Velikost textu
-vault-default-location = Výchozí (adresář s daty aplikace)
+vault-default-location = Výchozí (data aplikace)
 flatpak-permissions = Ve výchozím nastavení má verze Flatpak oprávnění přistupovat pouze ke složkám Dokumenty, Stažené a Obrázky. Přesunutí trezoru do jiného umístění způsobí, že aplikace přestane správně fungovat. Pokud chcete používat i jiné adresáře, upravte prosím oprávnění pomocí nástrojů, jako je Flatseal.
 flatpak-permissions-note = Upozornění: To samé platí pro načítání obrázků. Lokální obrázky se načtou pouze tehdy, když jsou ve složce s uděleným oprávněním.
+selected-font = Vybrané písmo
+default-font = Výchozí písmo
+font-selection-info = Některá písma nebudou fungovat a aplikace automaticky použije výchozí písmo (aniž by změnila vybrané písmo v nastavení). Nejde o chybu; je to zamýšlené chování.
 
 <#-- Application MenuBar -->
 file = Soubor
@@ -82,3 +89,7 @@ bullet-list = Odrážkový seznam
 numbered-list = Číslovaný seznam
 checkbox = Zaškrtávací políčko
 horizontal-rule = Horizontální čára
+
+<#-- Search -->
+search = Hledat
+no-results = Žádné výsledky

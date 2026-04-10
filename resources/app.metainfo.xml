@@ -40,6 +40,7 @@
       <li>Works completely offline</li>
       <li xml:lang="cs">Funguje zcela offline</li>
       <li>Typst support inside code blocks, for math...</li>
+      <li xml:lang="cs">Podpora Typst uvnitř bloků kódu, pro matematiku...</li>
     </ul>
     <p
         >This app has been developed with libcosmic for the COSMIC™ desktop, and issues may occur on
@@ -89,11 +90,13 @@
       <image>
         https://raw.githubusercontent.com/mariinkys/cedilla/main/resources/screenshots/typst-light.png</image>
       <caption>Typst Support (Light)</caption>
+      <caption xml:lang="cs">Podpora Typst (Světlý režim)</caption>
     </screenshot>
     <screenshot>
       <image>
         https://raw.githubusercontent.com/mariinkys/cedilla/main/resources/screenshots/typst-dark.png</image>
       <caption>Typst Support (Dark)</caption>
+      <caption xml:lang="cs">Podpora Typst (Tmavý režim)</caption>
     </screenshot>
   </screenshots>
 
