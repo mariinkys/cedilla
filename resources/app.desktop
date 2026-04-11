@@ -9,5 +9,5 @@ Terminal=false
 StartupNotify=true
 Categories=COSMIC;Utility;TextTools;Office;TextEditor;
 Keywords=COSMIC;Markdown;MD;Editor;Text;Writing;Notes;Documentation;Markup;Preview;
-MimeType=text/plain;text/markdown;text/x-markdown;
 Keywords[cs]=COSMIC;Markdown;MD;Editor;Text;Psaní;Poznámky;Dokumentace;Markup;Náhled;
+MimeType=text/plain;text/markdown;text/x-markdown;
