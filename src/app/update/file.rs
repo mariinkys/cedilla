@@ -18,7 +18,10 @@ use std::sync::Arc;
 use widgets::text_editor;
 
 impl AppModel {
-    pub fn handle_startup(&mut self) -> Task<cosmic::Action<Message>> {
+    pub fn handle_startup(
+        &mut self,
+        open_with_file: Option<PathBuf>,
+    ) -> Task<cosmic::Action<Message>> {
         let panes = create_default_panes();
 
         let preview_state = match self.config.last_preview_showstate {
@@ -26,10 +29,10 @@ impl AppModel {
             ShowState::Hide => PreviewState::Hidden,
         };
 
-        let path = match self.config.open_last_file {
+        let path = open_with_file.or_else(|| match self.config.open_last_file {
             BoolState::Yes => self.config.last_open_file.clone(),
             BoolState::No => None,
-        };
+        });
 
         if let Some(p) = path
             && p.exists()
