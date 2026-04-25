@@ -150,7 +150,7 @@ pub enum Message {
     NavMenuAction(NavMenuAction),
 
     /// Startup Message, checks config and set's the state as needed
-    Startup,
+    Startup(Option<PathBuf>),
     /// Creates a new empty file (no path)
     NewFile,
     /// Creates a new markdown file in the vault
@@ -347,7 +347,7 @@ impl cosmic::Application for AppModel {
         let tasks = vec![
             app.update_title(),
             cosmic::command::set_theme(app.config.app_theme.theme()),
-            Task::done(cosmic::action::app(Message::Startup)),
+            Task::done(cosmic::action::app(Message::Startup(flags.open_with_file))),
         ];
 
         (app, Task::batch(tasks))
@@ -737,7 +737,7 @@ impl cosmic::Application for AppModel {
             Message::NavMenuAction(action) => self.handle_nav_menu_action(action),
 
             // File
-            Message::Startup => self.handle_startup(),
+            Message::Startup(open_with_file) => self.handle_startup(open_with_file),
             Message::NewFile => self.handle_new_file(),
             Message::NewVaultFile(name) => self.handle_new_vault_file(name),
             Message::NewVaultFolder(name) => self.handle_new_vault_folder(name),
