@@ -142,6 +142,14 @@
   </keywords>
 
   <releases>
+    <release version="0.1.7" date="2026-05-04">
+        <description>
+            <p>Fixed a bug that prevented Open with Cedilla from working</p>
+            <p>Updated translations</p>
+            <p>Other fixes and improvments</p>
+            <p>Updated dependencies</p>
+        </description>
+    </release>
     <release version="0.1.6" date="2026-03-31">
         <description>
             <p>Preserve panes state when changing file</p>

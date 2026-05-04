@@ -5,8 +5,8 @@ use crate::app::{
     AppModel, Message, PreviewState, State, editor_scrollable_id, preview_scrollable_id,
 };
 use crate::config::BoolState;
-use cosmic::iced_widget::scrollable::scroll_to;
-use cosmic::iced_widget::{pane_grid, scrollable};
+use cosmic::iced::widget::scrollable::scroll_to;
+use cosmic::iced::widget::{pane_grid, scrollable};
 use cosmic::prelude::*;
 use cosmic::widget::{self};
 use frostmark::UpdateMsg;

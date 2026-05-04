@@ -13,7 +13,7 @@ use crate::{
 impl<'a, M: Clone + 'static, T: ValidTheme + 'a> MarkWidget<'a, M, T> {
     pub fn draw_typst(&self, source: &str) -> RenderedSpan<'a, M, T> {
         if let Some(handle) = self.state.typst_cache.borrow().get(source) {
-            return cosmic::iced_widget::column![
+            return cosmic::iced::widget::column![
                 widget::image(handle.clone()).width(Length::Shrink)
             ]
             .width(Length::Fill)
@@ -50,7 +50,7 @@ impl<'a, M: Clone + 'static, T: ValidTheme + 'a> MarkWidget<'a, M, T> {
                     .borrow_mut()
                     .insert(source.trim().to_owned(), r.handle.clone());
 
-                cosmic::iced_widget::column![widget::image(r.handle).width(Length::Shrink)]
+                cosmic::iced::widget::column![widget::image(r.handle).width(Length::Shrink)]
                     .width(Length::Fill)
                     .align_x(Alignment::Center)
                     .into()

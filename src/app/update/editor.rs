@@ -8,7 +8,7 @@ use crate::app::{
     text_editor_id,
 };
 use crate::config::BoolState;
-use cosmic::iced_widget::scrollable::scroll_to;
+use cosmic::iced::widget::scrollable::scroll_to;
 use cosmic::prelude::*;
 use widgets::text_editor;
 

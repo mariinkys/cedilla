@@ -14,10 +14,10 @@ use crate::{fl, icons};
 use cosmic::app::context_drawer;
 use cosmic::cosmic_config::Update;
 use cosmic::cosmic_theme::{self, ThemeMode};
+use cosmic::iced::core::keyboard::{Key, Modifiers};
+use cosmic::iced::core::window;
+use cosmic::iced::widget::{center, column, row, scrollable, tooltip};
 use cosmic::iced::{Alignment, Event, Font, Length, Padding, Subscription, highlighter};
-use cosmic::iced_core::keyboard::{Key, Modifiers};
-use cosmic::iced_core::window;
-use cosmic::iced_widget::{center, column, row, scrollable, tooltip};
 use cosmic::widget::space::horizontal;
 use cosmic::widget::{self, about::About, menu};
 use cosmic::widget::{
@@ -914,7 +914,7 @@ impl AppModel {
                                 text::body(fl!("current-location")),
                                 button::custom(
                                     text(location_label)
-                                        .wrapping(cosmic::iced_core::text::Wrapping::Glyph)
+                                        .wrapping(cosmic::iced::core::text::Wrapping::Glyph)
                                         .width(Length::Fill)
                                 )
                                 .on_press(Message::OpenInFileExplorer(PathBuf::from(
@@ -1326,14 +1326,14 @@ fn cedilla_main_view<'a>(
                     .right(spacing.space_s as f32),
             );
 
-        cosmic::iced_widget::stack!(base, overlay).into()
+        cosmic::iced::widget::stack!(base, overlay).into()
     }
 }
 
 // Watches for external changes on the currently open file
 fn file_watch_subscription(path: Option<PathBuf>) -> Subscription<Message> {
     use cosmic::iced::futures::SinkExt;
-    use cosmic::iced_futures::futures::channel::mpsc as iced_mpsc;
+    use cosmic::iced::futures::channel::mpsc as iced_mpsc;
     use notify::{EventKind, RecursiveMode, Watcher, recommended_watcher};
 
     let Some(path) = path else {
@@ -1343,7 +1343,7 @@ fn file_watch_subscription(path: Option<PathBuf>) -> Subscription<Message> {
     Subscription::run_with(path, |path| {
         let path_owned = path.clone();
 
-        cosmic::iced_futures::stream::channel(
+        cosmic::iced::stream::channel(
             16,
             move |mut output: iced_mpsc::Sender<Message>| async move {
                 let (tx, mut rx) = tokio::sync::mpsc::unbounded_channel::<PathBuf>();

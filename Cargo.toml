@@ -1,6 +1,6 @@
 [package]
 name = "cedilla"
-version = "0.1.6"
+version = "0.1.7"
 edition = "2024"
 license = "GPL-3.0"
 description = "A markdown text editor for the COSMIC™ desktop"
@@ -57,20 +57,20 @@ i18n-embed = { version = "0.16", features = [
     "desktop-requester",
 ] }
 i18n-embed-fl = "0.10"
-open = "5.3.3"
+open = "5.3.4"
 rust-embed = "8.11.0"
 
 # Added by me
 serde = { version = "1.0.228", features = ["derive"] }
-tokio = { version = "1.50.0", features = ["fs"] }
+tokio = { version = "1.52.2", features = ["fs"] }
 anywho = "0.1.2"
 dirs = "6.0.0"
 ignore = "0.4.25"
-icu_collator = { version = "2.1.1", features = ["compiled_data"] }
-icu_locale = { version = "2.1.1", features = ["compiled_data"] }
+icu_collator = { version = "2.2.0", features = ["compiled_data"] }
+icu_locale = { version = "2.2.0", features = ["compiled_data"] }
 slotmap = "1.1.1"
 percent-encoding = "2.3.2"
-reqwest = { version = "0.13.2", default-features = false, features = ["rustls"] }
+reqwest = { version = "0.13.3", default-features = false, features = ["rustls"] }
 url = "2.5.8"
 base64 = "0.22.1"
 regex = "1.12.3"

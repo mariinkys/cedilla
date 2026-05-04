@@ -1,4 +1,4 @@
-use cosmic::iced_widget::scrollable;
+use cosmic::iced::widget::scrollable;
 
 /// Maps `source` viewport's relative scroll to an absolute Y in `target` viewport's content.
 pub fn proportional_y(source: scrollable::Viewport, target: scrollable::Viewport) -> f32 {

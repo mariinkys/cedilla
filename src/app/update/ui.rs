@@ -3,7 +3,7 @@
 use crate::app::context_page::ContextPage;
 use crate::app::core::utils::CedillaToast;
 use crate::app::{AppModel, Message};
-use cosmic::iced_core::keyboard::{Key, Modifiers};
+use cosmic::iced::core::keyboard::{Key, Modifiers};
 use cosmic::widget::ToastId;
 use cosmic::{prelude::*, surface};
 

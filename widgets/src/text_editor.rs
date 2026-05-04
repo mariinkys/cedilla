@@ -40,26 +40,26 @@
 //! ```
 
 use cosmic::Theme;
-use cosmic::iced_core::clipboard::{self, Clipboard};
-use cosmic::iced_core::event::Event;
-use cosmic::iced_core::keyboard::key;
-use cosmic::iced_core::layout::{self, Layout};
-use cosmic::iced_core::mouse;
-use cosmic::iced_core::renderer;
-use cosmic::iced_core::text::editor::{Cursor, Editor as _};
-use cosmic::iced_core::text::highlighter::{self, Highlighter};
-use cosmic::iced_core::text::{self, Ellipsize, LineHeight, Text, Wrapping};
-use cosmic::iced_core::time::{Duration, Instant};
-use cosmic::iced_core::widget::operation;
-use cosmic::iced_core::widget::{self, Widget};
-use cosmic::iced_core::window;
-use cosmic::iced_core::{
+use cosmic::iced::core::clipboard::{self, Clipboard};
+use cosmic::iced::core::layout::{self, Layout};
+use cosmic::iced::core::renderer;
+use cosmic::iced::core::text::editor::{Cursor, Editor as _};
+use cosmic::iced::core::text::highlighter::{self, Highlighter};
+use cosmic::iced::core::text::{self, Ellipsize, LineHeight, Text, Wrapping};
+use cosmic::iced::core::widget::operation::focusable;
+use cosmic::iced::core::widget::{self, Widget};
+use cosmic::iced::core::{
     Background, Border, Color, Element, Length, Padding, Pixels, Point, Rectangle, Shell, Size,
     SmolStr, Vector,
 };
-use cosmic::iced_core::{InputMethod, alignment};
-use cosmic::iced_core::{input_method, keyboard};
-use cosmic::iced_runtime::{Action as RuntimeAction, Task, task};
+use cosmic::iced::core::{InputMethod, alignment};
+use cosmic::iced::core::{input_method, keyboard};
+use cosmic::iced::event::Event;
+use cosmic::iced::keyboard::key;
+use cosmic::iced::mouse;
+use cosmic::iced::runtime::{Action as RuntimeAction, Task, task};
+use cosmic::iced::time::{Duration, Instant};
+use cosmic::iced::window;
 use cosmic::widget::text_editor::{Line, LineEnding, Selection};
 
 use std::borrow::Cow;
@@ -183,11 +183,12 @@ where
 
 /// Produces a [`Task`] that focuses the [`TextEditor`] with the given [`Id`].
 pub fn focus<T>(id: impl Into<Id>) -> Task<T> {
-    task::effect(RuntimeAction::widget(operation::focusable::focus(
-        id.into().0,
-    )))
+    task::effect(RuntimeAction::widget(
+        cosmic::iced::daemon::program::graphics::core::widget::operation::focusable::focus(
+            id.into().0,
+        ),
+    ))
 }
-
 impl<'a, Highlighter, Message, Theme, Renderer>
     TextEditor<'a, Highlighter, Message, Theme, Renderer>
 where
@@ -285,7 +286,7 @@ where
         theme: cosmic::iced::highlighter::Theme,
     ) -> TextEditor<'a, cosmic::iced::highlighter::Highlighter, Message, Theme, Renderer>
     where
-        Renderer: text::Renderer<Font = cosmic::iced_core::Font>,
+        Renderer: text::Renderer<Font = cosmic::iced::core::Font>,
     {
         self.highlight_with::<cosmic::iced::highlighter::Highlighter>(
             cosmic::iced::highlighter::Settings {
@@ -555,8 +556,8 @@ where
 pub struct State<Highlighter: text::Highlighter> {
     focus: Option<Focus>,
     preedit: Option<input_method::Preedit>,
-    last_click: Option<mouse::Click>,
-    drag_click: Option<mouse::click::Kind>,
+    last_click: Option<cosmic::iced::daemon::program::graphics::core::mouse::Click>,
+    drag_click: Option<cosmic::iced::daemon::program::graphics::core::mouse::click::Kind>,
     partial_scroll: f32,
     last_theme: RefCell<Option<String>>,
     highlighter: RefCell<Highlighter>,
@@ -598,7 +599,7 @@ impl<Highlighter: text::Highlighter> State<Highlighter> {
     }
 }
 
-impl<Highlighter: text::Highlighter> operation::Focusable for State<Highlighter> {
+impl<Highlighter: text::Highlighter> focusable::Focusable for State<Highlighter> {
     fn is_focused(&self) -> bool {
         self.focus.is_some()
     }
@@ -649,7 +650,7 @@ where
         tree: &mut widget::Tree,
         renderer: &Renderer,
         limits: &layout::Limits,
-    ) -> cosmic::iced_renderer::core::layout::Node {
+    ) -> cosmic::iced::core::layout::Node {
         let mut internal = self.content.0.borrow_mut();
         let state = tree.state.downcast_mut::<State<Highlighter>>();
 
@@ -771,9 +772,9 @@ where
             match update {
                 Update::Click(click) => {
                     let action = match click.kind() {
-                        mouse::click::Kind::Single => Action::Click(click.position()),
-                        mouse::click::Kind::Double => Action::SelectWord,
-                        mouse::click::Kind::Triple => Action::SelectLine,
+                        cosmic::iced::daemon::program::graphics::core::mouse::click::Kind::Single => Action::Click(click.position()),
+                        cosmic::iced::daemon::program::graphics::core::mouse::click::Kind::Double => Action::SelectWord,
+                        cosmic::iced::daemon::program::graphics::core::mouse::click::Kind::Triple => Action::SelectLine,
                     };
 
                     state.focus = Some(Focus::now());
@@ -1256,7 +1257,7 @@ impl<Message> Binding<Message> {
 }
 
 enum Update<Message> {
-    Click(mouse::Click),
+    Click(cosmic::iced::daemon::program::graphics::core::mouse::Click),
     Drag(Point),
     Release,
     Scroll(f32),
@@ -1292,11 +1293,12 @@ impl<Message> Update<Message> {
                         let cursor_position =
                             cursor_position - Vector::new(padding.left, padding.top);
 
-                        let click = mouse::Click::new(
-                            cursor_position,
-                            mouse::Button::Left,
-                            state.last_click,
-                        );
+                        let click =
+                            cosmic::iced::daemon::program::graphics::core::mouse::Click::new(
+                                cursor_position,
+                                mouse::Button::Left,
+                                state.last_click,
+                            );
 
                         Some(Update::Click(click))
                     } else if state.focus.is_some() {
@@ -1311,7 +1313,9 @@ impl<Message> Update<Message> {
                 }
                 mouse::Event::ButtonReleased(mouse::Button::Left) => Some(Update::Release),
                 mouse::Event::CursorMoved { .. } => match state.drag_click {
-                    Some(mouse::click::Kind::Single) => {
+                    Some(
+                        cosmic::iced::daemon::program::graphics::core::mouse::click::Kind::Single,
+                    ) => {
                         let cursor_position =
                             cursor.position_in(bounds)? - Vector::new(padding.left, padding.top);
 

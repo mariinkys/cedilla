@@ -9,9 +9,9 @@ description = "HTML/Markdown renderer for libcosmic"
 libcosmic.workspace = true
 html5ever = "0.38"
 markup5ever_rcdom = "0.38.0"
-bitflags = "2.11.0"
+bitflags = "2.11.1"
 
-comrak = { version = "0.51", default-features = false, optional = true }
+comrak = { version = "0.52", default-features = false, optional = true }
 widgets = { path = "../widgets" }
 
 typst = "0.14.2"

@@ -9,7 +9,7 @@ use crate::app::{
 };
 use crate::app::{DiscardChangesAction, create_default_panes};
 use crate::config::{BoolState, ShowState};
-use cosmic::iced_widget::scrollable::scroll_to;
+use cosmic::iced::widget::scrollable::scroll_to;
 use cosmic::prelude::*;
 use frostmark::MarkState;
 use std::collections::{HashMap, HashSet};
