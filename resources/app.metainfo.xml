@@ -142,7 +142,7 @@
   </keywords>
 
   <releases>
-    <release version="0.1.7" date="2026-05-04">
+    <release version="0.1.7" date="2026-05-05">
         <description>
             <p>Fixed a bug that prevented Open with Cedilla from working</p>
             <p>Updated translations</p>
