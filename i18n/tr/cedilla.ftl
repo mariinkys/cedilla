@@ -23,7 +23,11 @@ delete-node = Dosyayı/Klasörü Sil
 delete-confirmation = Bu dosyayı veya klasörü içindekilerle birlikte silmek istediğinize emin misiniz? 
 save-changes-closing = Kapatmadan önce değişiklikler kaydedilsin mi? 
 save-warning = Kaydedilmemiş değişiklikleriniz var. Kaydetmeden devam ederseniz bu değişiklikler kaybolacak. 
-discard-changes = Değişiklikleri Yoksay 
+discard-changes = Değişiklikleri Yoksay
+file-changed-externally = Dosya dışarıdan değiştirildi.
+reload = Dosyayı Yeniden Yükle
+keep-my-version = Mevcut Sürümü Tut
+modified-text = başka bir program tarafından değiştirildi.
 
 <#-- Appearance -->
 appearance = Görünüm 
