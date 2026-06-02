@@ -70,11 +70,11 @@ icu_collator = { version = "2.2.0", features = ["compiled_data"] }
 icu_locale = { version = "2.2.0", features = ["compiled_data"] }
 slotmap = "1.1.1"
 percent-encoding = "2.3.2"
-reqwest = { version = "0.13.3", default-features = false, features = ["rustls"] }
+reqwest = { version = "0.13.4", default-features = false, features = ["rustls"] }
 url = "2.5.8"
 base64 = "0.22.1"
 regex = "1.12.3"
-pulldown-cmark = "0.13.3"
+pulldown-cmark = "0.13.4"
 dissimilar = "1.0.11"
 gotenberg_pdf = { git = "https://github.com/mariinkys/gotenberg_pdf" }
 font-kit = "0.14.3"

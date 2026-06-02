@@ -40,7 +40,7 @@ impl AppModel {
 
     pub fn handle_key(&mut self, modifiers: Modifiers, key: Key) -> Task<cosmic::Action<Message>> {
         for (key_bind, action) in self.key_binds.iter() {
-            if key_bind.matches(modifiers, &key) {
+            if key_bind.matches(modifiers, &key, None) {
                 return self.handle_menu_action(*action);
             }
         }
