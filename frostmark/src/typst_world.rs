@@ -1,5 +1,5 @@
 use std::collections::HashMap;
-use typst::foundations::{Bytes, Datetime};
+use typst::foundations::{Bytes, Datetime, Duration};
 use typst::syntax::{FileId, Source};
 use typst::text::{Font, FontBook};
 use typst::{Library, LibraryExt, World};
@@ -67,7 +67,7 @@ impl World for MinimalWorld {
         self.fonts.get(index).cloned()
     }
 
-    fn today(&self, _offset: Option<i64>) -> Option<Datetime> {
+    fn today(&self, _offset: Option<Duration>) -> Option<Datetime> {
         None
     }
 }

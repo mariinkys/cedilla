@@ -2,6 +2,7 @@ use cosmic::{
     iced::{Alignment, Length},
     widget,
 };
+use typst_layout::PagedDocument;
 
 use crate::{
     MarkWidget,
@@ -60,11 +61,16 @@ impl<'a, M: Clone + 'static, T: ValidTheme + 'a> MarkWidget<'a, M, T> {
     }
 }
 
-pub fn render_typst(source: &str, pixel_per_pt: f32) -> Result<TypstResult, ()> {
+pub fn render_typst(source: &str, pixel_per_pt: f64) -> Result<TypstResult, ()> {
     let world = MinimalWorld::new(source);
-    let document: typst::layout::PagedDocument = typst::compile(&world).output.map_err(|_| ())?;
-    let page = &document.pages[0];
-    let pixmap = typst_render::render(page, pixel_per_pt);
+    let document: PagedDocument = typst::compile(&world).output.map_err(|_| ())?;
+    let page = &document.pages()[0];
+    let render_opts = typst_render::RenderOptions {
+        pixel_per_pt: pixel_per_pt.into(),
+        ..Default::default()
+    };
+    let pixmap = typst_render::render(page, &render_opts);
+
     let width = pixmap.width();
     let height = pixmap.height();
     let rgba = unpremultiply(pixmap.take());
