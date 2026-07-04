@@ -11,7 +11,7 @@ html5ever = "0.39"
 markup5ever_rcdom = "0.39.0"
 bitflags = "2.13.0"
 
-comrak = { version = "0.52", default-features = false, optional = true }
+comrak = { version = "0.53", default-features = false, optional = true }
 widgets = { path = "../widgets" }
 
 typst = "0.15.0"

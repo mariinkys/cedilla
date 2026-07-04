@@ -1482,7 +1482,7 @@ pub fn default(theme: &Theme, _status: Status, is_code_block: bool) -> Style {
 
     if is_code_block {
         Style {
-            background: Background::Color(palette.background.component.base.into()),
+            background: Background::Color(palette.background(false).base.color.into()),
             border: Border {
                 radius: 4.0.into(),
                 width: 1.0,

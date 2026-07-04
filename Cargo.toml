@@ -57,7 +57,7 @@ i18n-embed = { version = "0.16", features = [
     "desktop-requester",
 ] }
 i18n-embed-fl = "0.10"
-open = "5.3.5"
+open = "5.3.6"
 rust-embed = "8.11.0"
 
 # Added by me
@@ -65,8 +65,8 @@ serde = { version = "1.0.228", features = ["derive"] }
 tokio = { version = "1.52.3", features = ["fs"] }
 anywho = "0.1.2"
 dirs = "6.0.0"
-ignore = "0.4.26"
-icu_collator = { version = "2.2.0", features = ["compiled_data"] }
+ignore = "0.4.27"
+icu_collator = { version = "2.2.1", features = ["compiled_data"] }
 icu_locale = { version = "2.2.0", features = ["compiled_data"] }
 slotmap = "1.1.1"
 percent-encoding = "2.3.2"

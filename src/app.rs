@@ -411,7 +411,7 @@ impl cosmic::Application for AppModel {
             .button_spacing(space_xxxs)
             .on_activate(|entity| cosmic::action::cosmic(cosmic::app::Action::NavBar(entity)))
             .on_context(|entity| cosmic::Action::App(Message::NavBarContext(entity)))
-            .context_menu(self.nav_context_menu(self.nav_bar_context_id))
+            .context_menu(self.nav_context_menu())
             .spacing(space_none)
             .style(theme::SegmentedButton::FileNav)
             .apply(widget::container)
@@ -437,96 +437,89 @@ impl cosmic::Application for AppModel {
     }
 
     fn nav_context_menu(
-        &self,
-        entity: widget::nav_bar::Id,
+        &self
     ) -> Option<Vec<widget::menu::Tree<cosmic::Action<Message>>>> {
-        if entity.is_null() {
-            return Some(vec![]);
-        }
-
         // All of the weird code with the ButtonDisabled stuff is because there seems to be many issues
         // with menu_inner crashing the app if there are more items in some context menus so all menus
         // must have the same number of items
-
-        // only one entry for root node
-        if self.nav_model.indent(entity).unwrap_or(0) == 0 {
-            return Some(cosmic::widget::menu::items(
-                &std::collections::HashMap::new(),
-                vec![
-                    cosmic::widget::menu::Item::ButtonDisabled(
-                        fl!("delete"),
-                        None,
-                        NavMenuAction::DeleteNode(entity),
-                    ),
-                    cosmic::widget::menu::Item::ButtonDisabled(
-                        fl!("rename"),
-                        None,
-                        NavMenuAction::RenameNode(entity),
-                    ),
-                    cosmic::widget::menu::Item::ButtonDisabled(
-                        fl!("move-to"),
-                        None,
-                        NavMenuAction::MoveNode(entity),
-                    ),
-                    cosmic::widget::menu::Item::Button(
-                        fl!("open-file-manager"),
-                        None,
-                        NavMenuAction::OpenNodeFileManager(entity),
-                    ),
-                    cosmic::widget::menu::Item::Button(
-                        fl!("new-folder"),
-                        None,
-                        NavMenuAction::OpenFolderCreationDialog(entity),
-                    ),
-                    cosmic::widget::menu::Item::Button(
-                        fl!("new-vault-file"),
-                        None,
-                        NavMenuAction::OpenVaultFileCreationDialog(entity),
-                    ),
-                ],
-            ));
-        }
-
-        // no need to use this for now as we don't have different context menu options for files and folders
-        //let node = self.nav_model.data::<ProjectNode>(entity)?;
-
-        let mut items = Vec::with_capacity(6);
-
-        items.push(cosmic::widget::menu::Item::Button(
-            fl!("delete"),
-            None,
-            NavMenuAction::DeleteNode(entity),
-        ));
-        items.push(cosmic::widget::menu::Item::Button(
-            fl!("rename"),
-            None,
-            NavMenuAction::RenameNode(entity),
-        ));
-        items.push(cosmic::widget::menu::Item::Button(
-            fl!("move-to"),
-            None,
-            NavMenuAction::MoveNode(entity),
-        ));
-        items.push(cosmic::widget::menu::Item::Button(
-            fl!("open-file-manager"),
-            None,
-            NavMenuAction::OpenNodeFileManager(entity),
-        ));
-        // If the entity is a file both creation dialogs will store the new folder/file in the parent folder
-        items.push(cosmic::widget::menu::Item::Button(
-            fl!("new-folder"),
-            None,
-            NavMenuAction::OpenFolderCreationDialog(entity),
-        ));
-        items.push(cosmic::widget::menu::Item::Button(
-            fl!("new-vault-file"),
-            None,
-            NavMenuAction::OpenVaultFileCreationDialog(entity),
-        ));
-
-        Some(cosmic::widget::menu::items(
+        Some(cosmic::widget::menu::nav_context(
             &std::collections::HashMap::new(),
-            items,
+            self.nav_model
+                .iter()
+                .map(|e| {
+                    // only one entry for root node
+                    if self.nav_model.indent(e).unwrap_or(0) == 0 {
+                        vec![
+                            cosmic::widget::menu::Item::ButtonDisabled(
+                                fl!("delete"),
+                                None,
+                                NavMenuAction::DeleteNode(e),
+                            ),
+                            cosmic::widget::menu::Item::ButtonDisabled(
+                                fl!("rename"),
+                                None,
+                                NavMenuAction::RenameNode(e),
+                            ),
+                            cosmic::widget::menu::Item::ButtonDisabled(
+                                fl!("move-to"),
+                                None,
+                                NavMenuAction::MoveNode(e),
+                            ),
+                            cosmic::widget::menu::Item::Button(
+                                fl!("open-file-manager"),
+                                None,
+                                NavMenuAction::OpenNodeFileManager(e),
+                            ),
+                            cosmic::widget::menu::Item::Button(
+                                fl!("new-folder"),
+                                None,
+                                NavMenuAction::OpenFolderCreationDialog(e),
+                            ),
+                            cosmic::widget::menu::Item::Button(
+                                fl!("new-vault-file"),
+                                None,
+                                NavMenuAction::OpenVaultFileCreationDialog(e),
+                            ),
+                        ]
+                    } else {
+                        // no need to use this for now as we don't have different context menu options for files and folders
+                        // let node = self.nav_model.data::<ProjectNode>(e)?;
+                        vec![
+                            cosmic::widget::menu::Item::Button(
+                                fl!("delete"),
+                                None,
+                                NavMenuAction::DeleteNode(e),
+                            ),
+                            cosmic::widget::menu::Item::Button(
+                                fl!("rename"),
+                                None,
+                                NavMenuAction::RenameNode(e),
+                            ),
+                            cosmic::widget::menu::Item::Button(
+                                fl!("move-to"),
+                                None,
+                                NavMenuAction::MoveNode(e),
+                            ),
+                            cosmic::widget::menu::Item::Button(
+                                fl!("open-file-manager"),
+                                None,
+                                NavMenuAction::OpenNodeFileManager(e),
+                            ),
+                            // If the entity is a file both creation dialogs will store the new folder/file in the parent folder
+                            cosmic::widget::menu::Item::Button(
+                                fl!("new-folder"),
+                                None,
+                                NavMenuAction::OpenFolderCreationDialog(e),
+                            ),
+                            cosmic::widget::menu::Item::Button(
+                                fl!("new-vault-file"),
+                                None,
+                                NavMenuAction::OpenVaultFileCreationDialog(e),
+                            ),
+                        ]
+                    }
+                })
+                .collect(),
         ))
     }
 
