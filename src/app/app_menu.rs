@@ -30,6 +30,8 @@ pub enum MenuAction {
     Redo,
     /// Search
     Search,
+    /// Close the current open popup dialog
+    CloseCurrentDialog,
 }
 
 impl menu::action::MenuAction for MenuAction {
@@ -48,6 +50,7 @@ impl menu::action::MenuAction for MenuAction {
             MenuAction::Undo => Message::MenuAction(MenuAction::Undo),
             MenuAction::Redo => Message::MenuAction(MenuAction::Redo),
             MenuAction::Search => Message::MenuAction(MenuAction::Search),
+            MenuAction::CloseCurrentDialog => Message::MenuAction(MenuAction::CloseCurrentDialog),
         }
     }
 }
