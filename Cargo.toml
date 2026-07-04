@@ -1,6 +1,6 @@
 [package]
 name = "cedilla"
-version = "0.1.7"
+version = "0.1.8"
 edition = "2024"
 license = "GPL-3.0"
 description = "A markdown text editor for the COSMIC™ desktop"

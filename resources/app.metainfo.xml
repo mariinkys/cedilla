@@ -142,6 +142,13 @@
   </keywords>
 
   <releases>
+    <release version="0.1.8" date="2026-07-04">
+        <description>
+            <p>Dialogs can now be dismissed using the Escape Key</p>
+            <p>Other fixes and improvments</p>
+            <p>Updated dependencies</p>
+        </description>
+    </release>
     <release version="0.1.7" date="2026-05-05">
         <description>
             <p>Fixed a bug that prevented Open with Cedilla from working</p>
