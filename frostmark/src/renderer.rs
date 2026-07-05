@@ -219,7 +219,7 @@ impl<'a, M: Clone + 'static, T: ValidTheme + 'a> MarkWidget<'a, M, T> {
                 if data.flags.contains(ChildDataFlags::INSIDE_RUBY) {
                     RenderedSpan::None
                 } else {
-                    widget::Column::new().into()
+                    RenderedSpan::Spans(vec![widget::span("\n").size(self.text_size)])
                 }
             }
             "hr" => widget::column![widget::rule::horizontal(1)]
@@ -658,7 +658,6 @@ fn is_block_element(node: &Node) -> bool {
             | "tfoot"
             | "ul"
             | "video"
-            | "br"
             | "details"
             | "summary" // not really block but acts like it
     )
