@@ -1046,6 +1046,7 @@ fn cedilla_main_view<'a>(
                         },
                         |highlight, _theme| highlight.to_format(),
                     )
+                    .key_binding(text_editor_key_bindings)
                     .size(app_config.text_size)
                     .font(font)
                     .padding(0)
@@ -1386,6 +1387,42 @@ fn file_watch_subscription(path: Option<PathBuf>) -> Subscription<Message> {
             },
         )
     })
+}
+
+/// Custom Text Editor Key Bindings
+fn text_editor_key_bindings(key_press: text_editor::KeyPress) -> Option<text_editor::Binding<Message>> {
+    use cosmic::iced::keyboard::{key::Named, Key};
+    use text_editor::{Binding, Motion, Status};
+
+    let text_editor::KeyPress {
+        modified_key,
+        modifiers,
+        status,
+        ..
+    } = &key_press;
+
+    // from_key_press() bails out unless focused we better do the same here
+    if !matches!(status, Status::Focused { .. }) {
+        return None;
+    }
+
+    // Ctrl+Backspace delete the previous word.
+    // Ctrl+Shift+Backspace delete the line
+    if matches!(modified_key, Key::Named(Named::Backspace)) && modifiers.jump() {
+        let motion = if modifiers.shift() {
+            Motion::Home
+        } else {
+            Motion::Left.widen()
+        };
+
+        return Some(Binding::Sequence(vec![
+            Binding::Select(motion),
+            Binding::Backspace,
+        ]));
+    }
+
+    // everything else we fall back to the default handling
+    Binding::from_key_press(key_press)
 }
 
 /// Returns the text editor scrollable Id
