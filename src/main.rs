@@ -11,6 +11,13 @@ mod icons;
 mod key_binds;
 
 fn main() -> cosmic::iced::Result {
+    tracing_subscriber::fmt()
+        .with_env_filter(
+            tracing_subscriber::EnvFilter::try_from_default_env()
+                .unwrap_or_else(|_| tracing_subscriber::EnvFilter::new("info,cosmic_config::dbus=off")),
+        )
+        .init();
+
     // Get the system's preferred languages.
     let requested_languages = i18n_embed::DesktopLanguageRequester::requested_languages();
 
@@ -32,5 +39,5 @@ fn main() -> cosmic::iced::Result {
     icons::ICON_CACHE.get_or_init(|| Mutex::new(icons::IconCache::new()));
 
     // Starts the application's event loop with `()` as the application's flags.
-    cosmic::app::run::<app::AppModel>(settings, flags())
+    cosmic::app::run::<app::AppModel>(settings, ())
 }

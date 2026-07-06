@@ -61,9 +61,11 @@ use cosmic::iced::runtime::{Action as RuntimeAction, Task, task};
 use cosmic::iced::time::{Duration, Instant};
 use cosmic::iced::window;
 use cosmic::widget::text_editor::{Line, LineEnding, Selection};
+use tracing::info;
 
 use std::borrow::Cow;
 use std::cell::RefCell;
+use std::fmt::Display;
 use std::ops::DerefMut;
 use std::sync::Arc;
 use std::{fmt, ops};
@@ -769,6 +771,8 @@ where
             self.key_binding.as_deref(),
             self.retain_focus_on_external_click,
         ) {
+            info!("Custom Text Editor Update: {}", update);
+
             match update {
                 Update::Click(click) => {
                     let action = match click.kind() {
@@ -1263,6 +1267,19 @@ enum Update<Message> {
     Scroll(f32),
     InputMethod(Ime),
     Binding(Binding<Message>),
+}
+
+impl<Message> Display for Update<Message> {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Self::Click(click) => write!(f, "Click({click:?})"),
+            Self::Drag(point) => write!(f, "Drag({point:?})"),
+            Self::Release => write!(f, "Release"),
+            Self::Scroll(delta) => write!(f, "Scroll({delta})"),
+            Self::InputMethod(_) => write!(f, "InputMethod"),
+            Self::Binding(_) => write!(f, "Binding"),
+        }
+    }
 }
 
 enum Ime {

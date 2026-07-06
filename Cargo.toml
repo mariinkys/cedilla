@@ -35,6 +35,8 @@ icu_locale.workspace = true
 font-kit.workspace = true
 grep.workspace = true
 notify.workspace = true
+tracing-subscriber.workspace = true
+tracing.workspace = true
 
 # PDF Generation Generation
 gotenberg_pdf.workspace = true
@@ -81,6 +83,8 @@ font-kit = "0.14.3"
 image = { version= "0.25.10", default-features=false }
 grep = "0.4.1"
 notify = "8.2.0"
+tracing = "0.1.44"
+tracing-subscriber = { version = "0.3.23", features = ["env-filter"] }
 
 [workspace.dependencies.libcosmic]
 git = "https://github.com/pop-os/libcosmic.git"
