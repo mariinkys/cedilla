@@ -822,7 +822,6 @@ where
                     }
                     Ime::Commit(text) => {
                         shell.publish(on_edit(Action::Edit(Edit::Paste(Arc::new(text)))));
-                        shell.capture_event();
                     }
                 },
                 Update::Binding(binding) => {
