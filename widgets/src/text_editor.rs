@@ -829,7 +829,10 @@ where
                         // A new (non-empty) composition has started, so the next
                         // commit is legitimate even if its text matches the last one.
                         if !content.is_empty() {
+                            info!("Preedit({:?}) — clearing guard", content);
                             state.last_commit = None;
+                        } else {
+                            info!("Preedit(empty) — guard untouched");
                         }
 
                         state.preedit = Some(input_method::Preedit {
@@ -841,16 +844,17 @@ where
                         shell.request_redraw();
                     }
                     Ime::Commit(text) => {
-                        // Drop a byte-identical commit echoed within a few ms with no
-                        // new composition in between (duplicate text-input stream on
-                        // GNOME). See: libcosmic creates two zwp_text_input_v3 objects.
-                        let is_echo = state.last_commit.as_ref().is_some_and(|(prev, at)| {
-                            *prev == text && at.elapsed() < Duration::from_millis(50)
-                        });
+                        let verdict = match state.last_commit.as_ref() {
+                            None => "no guard stored",
+                            Some((prev, _)) if *prev != text => "text mismatch",
+                            Some((_, at)) if at.elapsed() >= Duration::from_millis(50) => "too old",
+                            Some(_) => "ECHO — dropping",
+                        };
 
-                        info!("Ime::Commit({:?}) — is_echo: {}", text, is_echo);
+                        info!("Ime::Commit({:?}) — {}", text, verdict);
 
-                        if !is_echo {
+                        if verdict != "ECHO — dropping" {
+                            state.last_commit = Some((text.clone(), Instant::now()));
                             shell.publish(on_edit(Action::Edit(Edit::Paste(Arc::new(text)))));
                         }
                     }
