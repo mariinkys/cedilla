@@ -848,6 +848,8 @@ where
                             *prev == text && at.elapsed() < Duration::from_millis(50)
                         });
 
+                        info!("Ime::Commit({:?}) — is_echo: {}", text, is_echo);
+
                         if !is_echo {
                             shell.publish(on_edit(Action::Edit(Edit::Paste(Arc::new(text)))));
                         }
