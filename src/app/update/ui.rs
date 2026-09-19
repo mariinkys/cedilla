@@ -39,8 +39,8 @@ impl AppModel {
         page.toggle_context_page(self)
     }
 
-    pub fn handle_surface(&mut self, a: surface::Action) -> Task<cosmic::Action<Message>> {
-        cosmic::task::message(cosmic::Action::Cosmic(cosmic::app::Action::Surface(a)))
+    pub fn handle_surface(&mut self, a: surface::Action<Message>) -> Task<cosmic::Action<Message>> {
+        cosmic::task::message(cosmic::Action::Surface(a))
     }
 
     pub fn handle_key(&mut self, modifiers: Modifiers, key: Key) -> Task<cosmic::Action<Message>> {

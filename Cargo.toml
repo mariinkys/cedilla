@@ -66,7 +66,7 @@ rust-embed = "8.11.0"
 serde = { version = "1.0.229", features = ["derive"] }
 tokio = { version = "1.53.1", features = ["fs"] }
 anywho = "0.1.2"
-dirs = "6.0.0"
+dirs = "7.0.0"
 ignore = "0.4.33"
 icu_collator = { version = "2.3.1", features = ["compiled_data"] }
 icu_locale = { version = "2.3.1", features = ["compiled_data"] }
@@ -78,7 +78,7 @@ base64 = "0.23.1"
 regex = "1.13.1"
 pulldown-cmark = "0.13.4"
 dissimilar = "1.0.11"
-gotenberg_pdf = { git = "https://github.com/mariinkys/gotenberg_pdf" }
+gotenberg_pdf = { version = "0.6.0" }
 font-kit = "0.14.3"
 image = { version = "0.25.10", default-features = false, features = ["png"] }
 grep = "0.4.1"

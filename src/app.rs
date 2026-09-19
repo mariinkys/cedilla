@@ -135,7 +135,7 @@ pub enum Message {
     /// Opens (or closes if already open) the given [`ContextPage`]
     ToggleContextPage(ContextPage),
     /// Needed for responsive menu bar
-    Surface(surface::Action),
+    Surface(surface::Action<Message>),
     /// Executes the appropiate cosmic binding on keyboard shortcut
     Key(Modifiers, Key),
     /// Updates the current state of keyboard modifiers
