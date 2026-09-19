@@ -81,7 +81,7 @@ pub fn render_typst(source: &str, pixel_per_pt: f64) -> Result<TypstResult, ()> 
 }
 
 fn unpremultiply(data: Vec<u8>) -> Vec<u8> {
-    data.chunks_exact(4)
+    data.as_chunks::<4>().0.iter()
         .flat_map(|px| {
             let [r, g, b, a] = [px[0], px[1], px[2], px[3]];
             if a == 0 {
