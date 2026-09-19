@@ -142,6 +142,11 @@
   </keywords>
 
   <releases>
+    <release version="0.1.12" date="2026-09-19">
+        <description>
+            <p>Updated dependencies</p>
+        </description>
+    </release>
     <release version="0.1.11" date="2026-08-15">
         <description>
             <p>Added image pasting support</p>

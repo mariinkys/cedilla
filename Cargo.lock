@@ -793,7 +793,7 @@ dependencies = [
 
 [[package]]
 name = "cedilla"
-version = "0.1.11"
+version = "0.1.12"
 dependencies = [
  "anywho",
  "arboard",
