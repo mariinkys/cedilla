@@ -5,3 +5,4 @@ pub mod history;
 pub mod preview;
 pub mod project;
 pub mod utils;
+pub mod vim;

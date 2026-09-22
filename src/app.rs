@@ -35,9 +35,28 @@ use widgets::{TextEditor, text_editor};
 
 pub mod app_menu;
 mod context_page;
-mod core;
+pub mod core;
 mod dialogs;
 mod update;
+
+pub use core::vim::{VimMode, VimPendingOperator};
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum VimAction {
+    SetMode(VimMode),
+    SetPendingOperator(Option<VimPendingOperator>),
+    SetCountPrefix(Option<usize>),
+    ResetOperatorAndCount,
+    VisualYank { is_line: bool },
+    Escape,
+    GoToTop,
+    GoToBottom,
+    VisualGoToTop,
+    VisualGoToBottom,
+    YankLine,
+    DeleteLine,
+    Paste { before: bool },
+}
 
 const REPOSITORY: &str = env!("CARGO_PKG_REPOSITORY");
 
@@ -193,6 +212,10 @@ pub enum Message {
     Search(SearchAction),
     /// Smart paste (pastes images as Markdown or standard text)
     SmartPaste,
+    /// Vim mode related action
+    Vim(VimAction),
+    /// Toggle Vim Mode
+    ToggleVimMode,
 
     /// Update the HTML renderer state
     UpdateMarkState(UpdateMsg),
@@ -359,7 +382,8 @@ impl cosmic::Application for AppModel {
 
     /// Elements to pack at the start of the header bar.
     fn header_start(&self) -> Vec<Element<'_, Self::Message>> {
-        vec![app_menu::menu_bar(&self.key_binds)]
+        let is_vim = self.config.vim_mode == BoolState::Yes;
+        vec![app_menu::menu_bar(&self.key_binds, is_vim)]
     }
 
     /// Elements to pack at the end of the header bar.
@@ -759,6 +783,8 @@ impl cosmic::Application for AppModel {
             Message::Redo => self.handle_redo(),
             Message::Search(action) => self.handle_search(action),
             Message::SmartPaste => self.handle_smart_paste(),
+            Message::Vim(action) => self.handle_vim_action(action),
+            Message::ToggleVimMode => self.handle_toggle_vim_mode(),
 
             // Preview / Pane
             Message::UpdateMarkState(msg) => self.handle_update_mark_state(msg),
@@ -956,6 +982,17 @@ impl AppModel {
                     ),
                 )
                 .add(
+                    widget::settings::item::builder(fl!("vim-mode")).control(widget::dropdown(
+                        BoolState::all_labels(),
+                        Some(self.config.vim_mode.to_index()),
+                        |index| {
+                            Message::ConfigInput(ConfigInput::VimMode(
+                                BoolState::from_index(index),
+                            ))
+                        },
+                    )),
+                )
+                .add(
                     cosmic::widget::column::with_children(vec![
                         column![
                             text::body(fl!("pdf-exporting")),
@@ -1037,9 +1074,20 @@ fn cedilla_main_view<'a>(
                 }
             };
 
+            let is_vim = app_config.vim_mode == BoolState::Yes;
+            let is_block_cursor = is_vim
+                && matches!(
+                    editor.vim.mode,
+                    VimMode::Normal | VimMode::Visual | VimMode::VisualLine
+                );
+            let enable_ime = !is_vim || editor.vim.mode == VimMode::Insert;
+            let vim_state = editor.vim.clone();
+
             scrollable(
                 TextEditor::new(&editor.content)
                     .id(text_editor_id())
+                    .block_cursor(is_block_cursor)
+                    .enable_input_method(enable_ime)
                     .highlight_with::<highlighter::Highlighter>(
                         highlighter::Settings {
                             theme: highlighter_theme,
@@ -1052,7 +1100,15 @@ fn cedilla_main_view<'a>(
                         },
                         |highlight, _theme| highlight.to_format(),
                     )
-                    .key_binding(text_editor_key_bindings)
+                    .key_binding(move |key_press| {
+                        if is_vim
+                            && let Some(binding) =
+                                core::vim::handle_vim_key_press(&vim_state, &key_press)
+                        {
+                            return Some(binding);
+                        }
+                        text_editor_key_bindings(key_press)
+                    })
                     .size(app_config.text_size)
                     .font(font)
                     .padding(0)
@@ -1198,8 +1254,20 @@ fn cedilla_main_view<'a>(
             .size(12)
         };
 
+        let vim_indicator = if app_config.vim_mode == BoolState::Yes {
+            let mode_label = match editor.vim.mode {
+                VimMode::Normal => fl!("vim-normal"),
+                VimMode::Insert => fl!("vim-insert"),
+                VimMode::Visual => fl!("vim-visual"),
+                VimMode::VisualLine => fl!("vim-visual-line"),
+            };
+            text(format!("-- {mode_label} --")).size(12)
+        } else {
+            text("").size(12)
+        };
+
         container(
-            row![file_path, dirty_indicator, horizontal(), position]
+            row![file_path, dirty_indicator, horizontal(), vim_indicator, horizontal(), position]
                 .padding(spacing.space_xxs)
                 .spacing(spacing.space_xxs),
         )

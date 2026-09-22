@@ -5,6 +5,7 @@ use widgets::text_editor;
 
 use crate::app::core::{
     history::HistoryState, preview::MarkdownPreview, utils::search::SearchMatch,
+    vim::VimState,
 };
 
 pub struct EditorState {
@@ -20,6 +21,8 @@ pub struct EditorState {
     pub scroll: EditorScrollState,
     /// Holds the state of the search faetures of the editor
     pub search: EditorSearchState,
+    /// State of Vim mode for this editor
+    pub vim: VimState,
     /// Helper field to not open the external changes dialog when we save a file, move, delete...
     pub ignore_next_external_change: bool,
 }

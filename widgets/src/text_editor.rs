@@ -135,6 +135,8 @@ where
     ellipsize: Ellipsize,
     retain_focus_on_external_click: bool,
     is_code_block: bool,
+    block_cursor: bool,
+    enable_input_method: bool,
     class: Theme::Class<'a>,
     key_binding: Option<Box<dyn Fn(KeyPress) -> Option<Binding<Message>> + 'a>>,
     on_edit: Option<Box<dyn Fn(Action) -> Message + 'a>>,
@@ -166,6 +168,8 @@ where
             ellipsize: Ellipsize::default(),
             retain_focus_on_external_click: false,
             is_code_block: false,
+            block_cursor: false,
+            enable_input_method: true,
             class: <Theme as Catalog>::default(),
             key_binding: None,
             on_edit: None,
@@ -320,6 +324,8 @@ where
             ellipsize: self.ellipsize,
             retain_focus_on_external_click: self.retain_focus_on_external_click,
             is_code_block: self.is_code_block,
+            block_cursor: self.block_cursor,
+            enable_input_method: self.enable_input_method,
             class: self.class,
             key_binding: self.key_binding,
             on_edit: self.on_edit,
@@ -350,6 +356,20 @@ where
         self
     }
 
+    /// Sets whether to render a block cursor.
+    #[must_use]
+    pub fn block_cursor(mut self, block_cursor: bool) -> Self {
+        self.block_cursor = block_cursor;
+        self
+    }
+
+    /// Sets whether input method (IME) is enabled.
+    #[must_use]
+    pub fn enable_input_method(mut self, enable_input_method: bool) -> Self {
+        self.enable_input_method = enable_input_method;
+        self
+    }
+
     /// Sets the style class of the [`TextEditor`].
     #[must_use]
     pub fn class(mut self, class: impl Into<Theme::Class<'a>>) -> Self {
@@ -363,6 +383,10 @@ where
         renderer: &Renderer,
         layout: Layout<'_>,
     ) -> InputMethod<&'b str> {
+        if !self.enable_input_method {
+            return InputMethod::Disabled;
+        }
+
         let Some(Focus {
             is_window_focused: true,
             ..
@@ -567,6 +591,7 @@ pub struct State<Highlighter: text::Highlighter> {
     highlighter: RefCell<Highlighter>,
     highlighter_settings: Highlighter::Settings,
     highlighter_format_address: usize,
+    last_input_method_enabled: Option<bool>,
 }
 
 #[derive(Debug, Clone, Copy)]
@@ -640,6 +665,7 @@ where
             highlighter: RefCell::new(Highlighter::new(&self.highlighter_settings)),
             highlighter_settings: self.highlighter_settings.clone(),
             highlighter_format_address: self.highlighter_format as usize,
+            last_input_method_enabled: None,
         })
     }
 
@@ -765,6 +791,16 @@ where
             _ => {}
         }
 
+        if state.last_input_method_enabled != Some(self.enable_input_method) {
+            state.last_input_method_enabled = Some(self.enable_input_method);
+            if !self.enable_input_method {
+                state.preedit = None;
+                state.last_commit = None;
+            }
+            shell.request_input_method(&self.input_method(state, renderer, layout));
+            shell.request_redraw();
+        }
+
         if let Some(update) = Update::from_event(
             event,
             state,
@@ -773,6 +809,7 @@ where
             cursor,
             self.key_binding.as_deref(),
             self.retain_focus_on_external_click,
+            self.enable_input_method,
         ) {
             match update {
                 Update::Click(click) => {
@@ -1052,14 +1089,19 @@ where
                 if let Some(focus) = state.focus.as_ref()
                     && focus.is_cursor_visible()
                 {
+                    let font_size = self.text_size.unwrap_or_else(|| renderer.default_size());
+                    let cursor_width = if self.block_cursor {
+                        (font_size.0 * 0.6).max(8.0)
+                    } else {
+                        1.0
+                    };
+
                     let cursor = Rectangle::new(
                         position + translation,
                         Size::new(
-                            1.0,
+                            cursor_width,
                             self.line_height
-                                .to_absolute(
-                                    self.text_size.unwrap_or_else(|| renderer.default_size()),
-                                )
+                                .to_absolute(font_size)
                                 .into(),
                         ),
                     );
@@ -1070,7 +1112,14 @@ where
                                 bounds: clipped_cursor,
                                 ..renderer::Quad::default()
                             },
-                            style.value,
+                            if self.block_cursor {
+                                Color {
+                                    a: 0.5,
+                                    ..style.value
+                                }
+                            } else {
+                                style.value
+                            },
                         );
                     }
                 }
@@ -1302,6 +1351,7 @@ enum Ime {
 }
 
 impl<Message> Update<Message> {
+    #[allow(clippy::too_many_arguments)]
     fn from_event<H: Highlighter>(
         event: &Event,
         state: &State<H>,
@@ -1310,6 +1360,7 @@ impl<Message> Update<Message> {
         cursor: mouse::Cursor,
         key_binding: Option<&dyn Fn(KeyPress) -> Option<Binding<Message>>>,
         retain_focus_on_external_click: bool,
+        enable_input_method: bool,
     ) -> Option<Self> {
         let binding = |binding| Some(Update::Binding(binding));
 
@@ -1364,21 +1415,64 @@ impl<Message> Update<Message> {
                 }
                 _ => None,
             },
-            Event::InputMethod(event) => match event {
-                input_method::Event::Opened | input_method::Event::Closed => Some(
-                    Update::InputMethod(Ime::Toggle(matches!(event, input_method::Event::Opened))),
-                ),
-                input_method::Event::Preedit(content, selection) if state.focus.is_some() => {
-                    Some(Update::InputMethod(Ime::Preedit {
-                        content: content.clone(),
-                        selection: selection.clone(),
-                    }))
+            Event::InputMethod(event) => {
+                if !enable_input_method {
+                    if let input_method::Event::Commit(content) = event
+                        && state.focus.is_some()
+                        && let Some(key_binding) = key_binding
+                    {
+                        let status = Status::Focused {
+                            is_hovered: cursor.is_over(bounds),
+                        };
+                        let mut bindings = Vec::new();
+                        for c in content.chars() {
+                            let mut modifiers = keyboard::Modifiers::default();
+                            if c.is_uppercase() {
+                                modifiers |= keyboard::Modifiers::SHIFT;
+                            }
+                            let s = c.to_string();
+                            let smol: SmolStr = s.into();
+                            let key_press = KeyPress {
+                                key: keyboard::Key::Character(smol.clone()),
+                                modified_key: keyboard::Key::Character(smol.clone()),
+                                physical_key: keyboard::key::Physical::Unidentified(
+                                    keyboard::key::NativeCode::Unidentified,
+                                ),
+                                modifiers,
+                                text: Some(smol),
+                                status,
+                            };
+                            if let Some(binding) = key_binding(key_press) {
+                                bindings.push(binding);
+                            }
+                        }
+                        if !bindings.is_empty() {
+                            return Some(Update::Binding(if bindings.len() == 1 {
+                                bindings.remove(0)
+                            } else {
+                                Binding::Sequence(bindings)
+                            }));
+                        }
+                    }
+                    None
+                } else {
+                    match event {
+                        input_method::Event::Opened | input_method::Event::Closed => Some(
+                            Update::InputMethod(Ime::Toggle(matches!(event, input_method::Event::Opened))),
+                        ),
+                        input_method::Event::Preedit(content, selection) if state.focus.is_some() => {
+                            Some(Update::InputMethod(Ime::Preedit {
+                                content: content.clone(),
+                                selection: selection.clone(),
+                            }))
+                        }
+                        input_method::Event::Commit(content) if state.focus.is_some() => {
+                            Some(Update::InputMethod(Ime::Commit(content.clone())))
+                        }
+                        _ => None,
+                    }
                 }
-                input_method::Event::Commit(content) if state.focus.is_some() => {
-                    Some(Update::InputMethod(Ime::Commit(content.clone())))
-                }
-                _ => None,
-            },
+            }
             Event::Keyboard(keyboard::Event::KeyPressed {
                 key,
                 modified_key,
@@ -1542,4 +1636,103 @@ pub(crate) fn convert_macos_shortcut(
     };
 
     Some(keyboard::Key::Named(key))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_enable_input_method_builder() {
+        let content = Content::with_text("hello");
+        let editor: TextEditor<'_, highlighter::PlainText, ()> = TextEditor::new(&content);
+        assert!(editor.enable_input_method);
+
+        let editor = editor.enable_input_method(false);
+        assert!(!editor.enable_input_method);
+
+        let highlighted = editor.highlight_with::<highlighter::PlainText>((), |_h, _t| {
+            highlighter::Format::default()
+        });
+        assert!(!highlighted.enable_input_method);
+
+        let re_enabled = highlighted.enable_input_method(true);
+        assert!(re_enabled.enable_input_method);
+    }
+
+    #[test]
+    fn test_from_event_input_method_commit_when_disabled() {
+        let state: State<highlighter::PlainText> = State {
+            focus: Some(Focus::now()),
+            preedit: None,
+            last_click: None,
+            drag_click: None,
+            partial_scroll: 0.0,
+            last_commit: None,
+            last_theme: RefCell::default(),
+            highlighter: RefCell::new(highlighter::PlainText),
+            highlighter_settings: (),
+            highlighter_format_address: 0,
+            last_input_method_enabled: None,
+        };
+
+        let commit_event = Event::InputMethod(input_method::Event::Commit("i".to_string()));
+        let key_binding = |kp: KeyPress| {
+            if let keyboard::Key::Character(c) = kp.key {
+                if c == "i" {
+                    return Some(Binding::Custom("enter_insert_mode"));
+                }
+            }
+            None
+        };
+
+        // When IME is disabled, Commit("i") should route through key_binding
+        let update = Update::from_event(
+            &commit_event,
+            &state,
+            Rectangle::default(),
+            Padding::default(),
+            mouse::Cursor::Unavailable,
+            Some(&key_binding),
+            false,
+            false, // enable_input_method = false
+        );
+
+        assert!(matches!(
+            update,
+            Some(Update::Binding(Binding::Custom("enter_insert_mode")))
+        ));
+
+        // When unhandled key commit arrives and IME is disabled, it should return None (never paste!)
+        let unhandled_event = Event::InputMethod(input_method::Event::Commit("x".to_string()));
+        let update_unhandled = Update::from_event(
+            &unhandled_event,
+            &state,
+            Rectangle::default(),
+            Padding::default(),
+            mouse::Cursor::Unavailable,
+            Some(&key_binding),
+            false,
+            false, // enable_input_method = false
+        );
+        assert!(update_unhandled.is_none());
+
+        // When IME is enabled, Commit("hello") should produce Update::InputMethod(Ime::Commit)
+        let normal_commit_event =
+            Event::InputMethod(input_method::Event::Commit("hello".to_string()));
+        let update_enabled = Update::from_event(
+            &normal_commit_event,
+            &state,
+            Rectangle::default(),
+            Padding::default(),
+            mouse::Cursor::Unavailable,
+            Some(&key_binding),
+            false,
+            true, // enable_input_method = true
+        );
+        assert!(matches!(
+            update_enabled,
+            Some(Update::InputMethod(Ime::Commit(text))) if text == "hello"
+        ));
+    }
 }

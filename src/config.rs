@@ -30,6 +30,7 @@ pub struct CedillaConfig {
     pub light_highlighter_theme: CedillaHighlighterTheme,
     pub dark_highlighter_theme: CedillaHighlighterTheme,
     pub selected_font_family: Option<String>,
+    pub vim_mode: BoolState,
 }
 
 impl Default for CedillaConfig {
@@ -62,6 +63,7 @@ impl Default for CedillaConfig {
                 cosmic::iced::highlighter::Theme::Base16Ocean,
             ),
             selected_font_family: None,
+            vim_mode: BoolState::No,
         }
     }
 }
@@ -255,4 +257,6 @@ pub enum ConfigInput {
     UpdateFont(usize),
     /// Reset to the default font
     ResetFont,
+    /// Update if vim mode is enabled or not
+    VimMode(BoolState),
 }

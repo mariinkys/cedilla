@@ -34,6 +34,8 @@ pub enum MenuAction {
     Search,
     /// Close the current open popup dialog
     CloseCurrentDialog,
+    /// Toggle Vim Mode
+    ToggleVimMode,
 }
 
 impl menu::action::MenuAction for MenuAction {
@@ -54,11 +56,15 @@ impl menu::action::MenuAction for MenuAction {
             MenuAction::PasteImage => Message::MenuAction(MenuAction::PasteImage),
             MenuAction::Search => Message::MenuAction(MenuAction::Search),
             MenuAction::CloseCurrentDialog => Message::MenuAction(MenuAction::CloseCurrentDialog),
+            MenuAction::ToggleVimMode => Message::MenuAction(MenuAction::ToggleVimMode),
         }
     }
 }
 
-pub fn menu_bar<'a>(key_binds: &HashMap<KeyBind, MenuAction>) -> Element<'a, Message> {
+pub fn menu_bar<'a>(
+    key_binds: &HashMap<KeyBind, MenuAction>,
+    vim_mode: bool,
+) -> Element<'a, Message> {
     menu::bar(vec![
         menu::Tree::with_children(
             menu::root(fl!("file")).apply(Element::from),
@@ -83,6 +89,13 @@ pub fn menu_bar<'a>(key_binds: &HashMap<KeyBind, MenuAction>) -> Element<'a, Mes
                     menu::Item::Button(fl!("redo"), None, MenuAction::Redo),
                     menu::Item::Button(fl!("paste-image"), None, MenuAction::PasteImage),
                     menu::Item::Button(fl!("search"), None, MenuAction::Search),
+                    menu::Item::Divider,
+                    menu::Item::CheckBox(
+                        fl!("vim-mode"),
+                        None,
+                        vim_mode,
+                        MenuAction::ToggleVimMode,
+                    ),
                 ],
             ),
         ),

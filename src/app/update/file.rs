@@ -4,6 +4,7 @@ use crate::app::core::editor::{EditorScrollState, EditorSearchState, EditorState
 use crate::app::core::history::HistoryState;
 use crate::app::core::preview::MarkdownPreview;
 use crate::app::core::utils::{self, CedillaToast};
+use crate::app::core::vim::VimState;
 use crate::app::{
     AppModel, Message, PreviewState, State, editor_scrollable_id, preview_scrollable_id,
 };
@@ -56,6 +57,7 @@ impl AppModel {
                 history: HistoryState::default(),
                 scroll: EditorScrollState::default(),
                 search: EditorSearchState::default(),
+                vim: VimState::default(),
                 ignore_next_external_change: false,
             },
             preview: MarkdownPreview {
@@ -87,6 +89,7 @@ impl AppModel {
                     ..EditorScrollState::default()
                 },
                 search: EditorSearchState::default(),
+                vim: VimState::default(),
                 ignore_next_external_change: false,
             },
             preview: MarkdownPreview {
@@ -150,6 +153,7 @@ impl AppModel {
                     ..EditorScrollState::default()
                 },
                 search: EditorSearchState::default(),
+                vim: VimState::default(),
                 ignore_next_external_change: false,
             },
             preview: MarkdownPreview {
@@ -265,6 +269,7 @@ impl AppModel {
                             ..EditorScrollState::default()
                         },
                         search: EditorSearchState::default(),
+                        vim: VimState::default(),
                         ignore_next_external_change: false,
                     },
                     preview: MarkdownPreview {

@@ -86,6 +86,16 @@ impl AppModel {
                 }
                 Ok(())
             }),
+            ConfigInput::VimMode(state) => self.apply_config(|config, handler| {
+                if let Some(h) = handler {
+                    config
+                        .set_vim_mode(h, state)
+                        .map_err(|e| e.to_string())?;
+                } else {
+                    config.vim_mode = state;
+                }
+                Ok(())
+            }),
             ConfigInput::GotenbergUrlInput(state) => self.apply_config(|config, handler| {
                 if let Some(h) = handler {
                     config
