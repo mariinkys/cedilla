@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0
 
 use crate::app::core::editor::{EditorSearchState, EditorState};
+use crate::app::core::utils::clipboard::{ClipboardContent, PasteMode};
 use crate::app::core::utils::search::SearchAction;
 use crate::app::core::utils::{self};
 use crate::app::{
@@ -62,64 +63,49 @@ impl AppModel {
         self.apply_formatting_to_selection(action)
     }
 
+    /// Ctrl+P / menu action: paste an image from the clipboard.
     pub fn handle_paste_image(&mut self) -> Task<cosmic::Action<Message>> {
-        let State::Ready {
-            editor, preview, ..
-        } = &mut self.state
-        else {
-            return Task::none();
-        };
+        read_clipboard(PasteMode::ImageOnly)
+    }
 
-        let target_dir = match &editor.path {
-            Some(path) => path
-                .parent()
-                .map(std::path::PathBuf::from)
-                .unwrap_or_else(|| self.config.vault_path()),
-            None => self.config.vault_path(),
-        };
+    /// Ctrl+V: pastes images as Markdown, falling back to plain text.
+    pub fn handle_smart_paste(&mut self) -> Task<cosmic::Action<Message>> {
+        read_clipboard(PasteMode::Smart)
+    }
 
-        match utils::images::save_clipboard_image(&target_dir) {
-            Ok(file_name) => {
-                let cursor_before = editor.content.cursor().position;
-                let selection = editor.content.selection().unwrap_or_default();
-                let alt = if selection.is_empty() { "" } else { &selection };
-                let image_tag = format!("![{alt}]({file_name})");
-
-                editor
-                    .content
-                    .perform(text_editor::Action::Edit(text_editor::Edit::Paste(
-                        std::sync::Arc::new(image_tag),
-                    )));
-
-                editor.is_dirty = true;
-                editor.push_history((cursor_before.line, cursor_before.column));
-
-                preview.update_content(editor.content.text().as_ref());
-
-                let sync_preview = self.config.scrollbar_sync == BoolState::Yes;
-                let cursor_task = ensure_cursor_visible(editor, sync_preview);
-
-                utils::images::download_images(
-                    &mut preview.markstate,
-                    &mut preview.images_in_progress,
-                    &editor.path,
-                )
-                .chain(cursor_task)
-            }
-            Err(err) => {
-                eprintln!("Failed to paste image: {err}");
-                self.handle_add_toast(utils::CedillaToast::new(crate::fl!(
-                    "no-image-clipboard"
-                )))
-            }
+    pub fn handle_clipboard_data(
+        &mut self,
+        mode: PasteMode,
+        content: Option<ClipboardContent>,
+    ) -> Task<cosmic::Action<Message>> {
+        match content {
+            Some(content) => self.paste_clipboard_content(mode, content),
+            // Nothing recognised was offered, or the backend can't read typed data (X11)
+            None => cosmic::iced::clipboard::read()
+                .map(move |text| cosmic::action::app(Message::ClipboardText(mode, text))),
         }
     }
 
-    pub fn handle_smart_paste(&mut self) -> Task<cosmic::Action<Message>> {
-        let State::Ready {
-            editor, preview, ..
-        } = &mut self.state
-        else {
+    pub fn handle_clipboard_text(
+        &mut self,
+        mode: PasteMode,
+        text: Option<String>,
+    ) -> Task<cosmic::Action<Message>> {
+        match text {
+            Some(text) => self.paste_clipboard_content(mode, ClipboardContent::Text(text)),
+            None => match mode {
+                PasteMode::Smart => Task::none(),
+                PasteMode::ImageOnly => self.no_image_in_clipboard_toast(),
+            },
+        }
+    }
+
+    fn paste_clipboard_content(
+        &mut self,
+        mode: PasteMode,
+        content: ClipboardContent,
+    ) -> Task<cosmic::Action<Message>> {
+        let State::Ready { editor, .. } = &self.state else {
             return Task::none();
         };
 
@@ -131,57 +117,95 @@ impl AppModel {
             None => self.config.vault_path(),
         };
 
-        // Try pasting as an image first
-        if let Ok(file_name) = utils::images::save_clipboard_image(&target_dir) {
-            let cursor_before = editor.content.cursor().position;
-            let selection = editor.content.selection().unwrap_or_default();
-            let alt = if selection.is_empty() { "" } else { &selection };
-            let image_tag = format!("![{alt}]({file_name})");
-
-            editor
-                .content
-                .perform(text_editor::Action::Edit(text_editor::Edit::Paste(
-                    std::sync::Arc::new(image_tag),
-                )));
-
-            editor.is_dirty = true;
-            editor.push_history((cursor_before.line, cursor_before.column));
-
-            preview.update_content(editor.content.text().as_ref());
-
-            let sync_preview = self.config.scrollbar_sync == BoolState::Yes;
-            let cursor_task = ensure_cursor_visible(editor, sync_preview);
-
-            return utils::images::download_images(
-                &mut preview.markstate,
-                &mut preview.images_in_progress,
-                &editor.path,
-            )
-            .chain(cursor_task);
-        }
-
-        // Fall back to standard text paste
-        #[allow(clippy::collapsible_if)]
-        if let Ok(mut clipboard) = arboard::Clipboard::new() {
-            if let Ok(text) = clipboard.get_text() {
-                let cursor_before = editor.content.cursor().position;
-                editor
-                    .content
-                    .perform(text_editor::Action::Edit(text_editor::Edit::Paste(
-                        std::sync::Arc::new(text),
-                    )));
-
-                editor.is_dirty = true;
-                editor.push_history((cursor_before.line, cursor_before.column));
-
-                preview.update_content(editor.content.text().as_ref());
-
-                let sync_preview = self.config.scrollbar_sync == BoolState::Yes;
-                return ensure_cursor_visible(editor, sync_preview);
+        let image_ref = match &content {
+            ClipboardContent::Image { bytes, extension } => {
+                utils::images::save_image_bytes(&target_dir, bytes, extension).map(Some)
             }
-        }
+            ClipboardContent::Text(text) => {
+                utils::images::copy_image_from_text_path(&target_dir, text)
+            }
+        };
 
-        Task::none()
+        match (image_ref, content, mode) {
+            (Ok(Some(file_name)), _, _) => self.insert_image_tag(&file_name),
+            (Ok(None), ClipboardContent::Text(text), PasteMode::Smart) => {
+                self.insert_pasted_text(text)
+            }
+            (Err(err), ClipboardContent::Text(text), PasteMode::Smart) => {
+                eprintln!("Failed to paste image: {err}");
+                self.insert_pasted_text(text)
+            }
+            (Err(err), _, PasteMode::Smart) => {
+                eprintln!("Failed to paste image: {err}");
+                Task::none()
+            }
+            (Err(err), _, PasteMode::ImageOnly) => {
+                eprintln!("Failed to paste image: {err}");
+                self.no_image_in_clipboard_toast()
+            }
+            (Ok(None), _, _) => self.no_image_in_clipboard_toast(),
+        }
+    }
+
+    fn insert_image_tag(&mut self, file_name: &str) -> Task<cosmic::Action<Message>> {
+        let State::Ready {
+            editor, preview, ..
+        } = &mut self.state
+        else {
+            return Task::none();
+        };
+
+        let cursor_before = editor.content.cursor().position;
+        let selection = editor.content.selection().unwrap_or_default();
+        let alt = if selection.is_empty() { "" } else { &selection };
+        let image_tag = format!("![{alt}]({file_name})");
+
+        editor
+            .content
+            .perform(text_editor::Action::Edit(text_editor::Edit::Paste(
+                std::sync::Arc::new(image_tag),
+            )));
+
+        editor.is_dirty = true;
+        editor.push_history((cursor_before.line, cursor_before.column));
+        preview.update_content(editor.content.text().as_ref());
+
+        let sync_preview = self.config.scrollbar_sync == BoolState::Yes;
+        let cursor_task = ensure_cursor_visible(editor, sync_preview);
+
+        utils::images::download_images(
+            &mut preview.markstate,
+            &mut preview.images_in_progress,
+            &editor.path,
+        )
+        .chain(cursor_task)
+    }
+
+    fn insert_pasted_text(&mut self, text: String) -> Task<cosmic::Action<Message>> {
+        let State::Ready {
+            editor, preview, ..
+        } = &mut self.state
+        else {
+            return Task::none();
+        };
+
+        let cursor_before = editor.content.cursor().position;
+        editor
+            .content
+            .perform(text_editor::Action::Edit(text_editor::Edit::Paste(
+                std::sync::Arc::new(text),
+            )));
+
+        editor.is_dirty = true;
+        editor.push_history((cursor_before.line, cursor_before.column));
+        preview.update_content(editor.content.text().as_ref());
+
+        let sync_preview = self.config.scrollbar_sync == BoolState::Yes;
+        ensure_cursor_visible(editor, sync_preview)
+    }
+
+    fn no_image_in_clipboard_toast(&mut self) -> Task<cosmic::Action<Message>> {
+        self.handle_add_toast(utils::CedillaToast::new(crate::fl!("no-image-clipboard")))
     }
 
     pub fn handle_toggle_checkbox(
@@ -461,4 +485,10 @@ fn task_marker_column(line: &str) -> Option<usize> {
         && chars.get(i + 3).is_none_or(|c| c.is_whitespace());
 
     is_task.then_some(i + 1)
+}
+
+/// Reads the clipboard through the window's own clipboard.
+fn read_clipboard(mode: PasteMode) -> Task<cosmic::Action<Message>> {
+    cosmic::iced::clipboard::read_data::<ClipboardContent>()
+        .map(move |content| cosmic::action::app(Message::ClipboardData(mode, content)))
 }

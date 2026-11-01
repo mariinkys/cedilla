@@ -5,6 +5,7 @@ use crate::app::context_page::ContextPage;
 use crate::app::core::editor::EditorState;
 use crate::app::core::preview::MarkdownPreview;
 use crate::app::core::project::ProjectNode;
+use crate::app::core::utils::clipboard::{ClipboardContent, PasteMode};
 use crate::app::core::utils::search::SearchAction;
 use crate::app::core::utils::{self, CedillaToast, Image};
 use crate::app::dialogs::{DialogPage, DialogState};
@@ -193,6 +194,10 @@ pub enum Message {
     Search(SearchAction),
     /// Smart paste (pastes images as Markdown or standard text)
     SmartPaste,
+    /// Typed clipboard contents (image / file list / text) read for a paste
+    ClipboardData(PasteMode, Option<ClipboardContent>),
+    /// Plain text clipboard contents, fallback when no typed data could be read
+    ClipboardText(PasteMode, Option<String>),
     /// A checkbox in the preview was clicked (index in the document, new value)
     ToggleCheckbox(usize, bool),
 
@@ -442,9 +447,7 @@ impl cosmic::Application for AppModel {
         Some(&self.nav_model)
     }
 
-    fn nav_context_menu(
-        &self
-    ) -> Option<Vec<widget::menu::Tree<cosmic::Action<Message>>>> {
+    fn nav_context_menu(&self) -> Option<Vec<widget::menu::Tree<cosmic::Action<Message>>>> {
         // All of the weird code with the ButtonDisabled stuff is because there seems to be many issues
         // with menu_inner crashing the app if there are more items in some context menus so all menus
         // must have the same number of items
@@ -765,6 +768,8 @@ impl cosmic::Application for AppModel {
             Message::Redo => self.handle_redo(),
             Message::Search(action) => self.handle_search(action),
             Message::SmartPaste => self.handle_smart_paste(),
+            Message::ClipboardData(mode, content) => self.handle_clipboard_data(mode, content),
+            Message::ClipboardText(mode, text) => self.handle_clipboard_text(mode, text),
             Message::ToggleCheckbox(index, value) => self.handle_toggle_checkbox(index, value),
 
             // Preview / Pane
@@ -1405,8 +1410,10 @@ fn file_watch_subscription(path: Option<PathBuf>) -> Subscription<Message> {
 }
 
 /// Custom Text Editor Key Bindings
-fn text_editor_key_bindings(key_press: text_editor::KeyPress) -> Option<text_editor::Binding<Message>> {
-    use cosmic::iced::keyboard::{key::Named, Key};
+fn text_editor_key_bindings(
+    key_press: text_editor::KeyPress,
+) -> Option<text_editor::Binding<Message>> {
+    use cosmic::iced::keyboard::{Key, key::Named};
     use text_editor::{Binding, Motion, Status};
 
     let text_editor::KeyPress {
