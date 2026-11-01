@@ -34,19 +34,20 @@ impl AppModel {
             editor.content.perform(action);
         }
 
-        preview.update_content(editor.content.text().as_ref());
-
-        if was_edit {
-            editor.is_dirty = true;
-            editor.push_history((cursor_before.line, cursor_before.column));
+        // clicks, selections, cursor moves and scrolling don't change the text:
+        // no need to re-render the preview or record history for them
+        if !was_edit {
+            return Task::none();
         }
 
+        let text = editor.content.text();
+        preview.update_content(&text);
+
+        editor.is_dirty = true;
+        editor.push_history_text((cursor_before.line, cursor_before.column), text);
+
         let sync_preview = self.config.scrollbar_sync == BoolState::Yes;
-        let cursor_task = if was_edit {
-            ensure_cursor_visible(editor, sync_preview)
-        } else {
-            Task::none()
-        };
+        let cursor_task = ensure_cursor_visible(editor, sync_preview);
 
         utils::images::download_images(
             &mut preview.markstate,
