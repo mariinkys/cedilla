@@ -14,6 +14,12 @@ use cosmic::prelude::*;
 use cosmic::widget::text_editor::{Cursor, Position};
 use widgets::text_editor;
 
+/// Documents up to this size (in bytes) re-render the preview on every keystroke.
+const PREVIEW_DEBOUNCE_MIN_LEN: usize = 10_000;
+
+/// How long typing has to pause before a long document's preview is re-rendered.
+const PREVIEW_DEBOUNCE: std::time::Duration = std::time::Duration::from_millis(150);
+
 impl AppModel {
     pub fn handle_edit(&mut self, action: text_editor::Action) -> Task<cosmic::Action<Message>> {
         let State::Ready {
@@ -51,19 +57,55 @@ impl AppModel {
         }
 
         let text = editor.content.text();
-        preview.update_content(&text);
+
+        // short notes re-render right away, long ones wait until typing pauses
+        let preview_task = if text.len() <= PREVIEW_DEBOUNCE_MIN_LEN {
+            preview.update_content(&text);
+            utils::images::download_images(
+                &mut preview.markstate,
+                &mut preview.images_in_progress,
+                &editor.path,
+            )
+        } else {
+            self.preview_generation = self.preview_generation.wrapping_add(1);
+            let generation = self.preview_generation;
+            Task::perform(
+                async move {
+                    tokio::time::sleep(PREVIEW_DEBOUNCE).await;
+                    generation
+                },
+                |generation| cosmic::action::app(Message::RefreshPreview(generation)),
+            )
+        };
 
         editor.is_dirty = true;
         editor.push_history_text((cursor_before.line, cursor_before.column), text);
 
-        let cursor_task = ensure_cursor_visible();
+        // batch, not chain: scrolling shouldn't wait for the preview or image downloads
+        Task::batch([preview_task, ensure_cursor_visible()])
+    }
+
+    /// Debounced preview re-render. Only the latest scheduled refresh does any work.
+    pub fn handle_refresh_preview(&mut self, generation: u64) -> Task<cosmic::Action<Message>> {
+        if generation != self.preview_generation {
+            // more typing happened since this one was scheduled
+            return Task::none();
+        }
+
+        let State::Ready {
+            editor, preview, ..
+        } = &mut self.state
+        else {
+            return Task::none();
+        };
+
+        preview.update_content(&editor.content.text());
 
         utils::images::download_images(
             &mut preview.markstate,
             &mut preview.images_in_progress,
             &editor.path,
         )
-        .chain(cursor_task)
     }
 
     pub fn handle_apply_formatting(

@@ -2303,19 +2303,6 @@
     {
         "type": "archive",
         "archive-type": "tar-gzip",
-        "url": "https://static.crates.io/crates/dissimilar/dissimilar-1.0.11.crate",
-        "sha256": "aeda16ab4059c5fd2a83f2b9c9e9c981327b18aa8e3b313f7e6563799d4f093e",
-        "dest": "cargo/vendor/dissimilar-1.0.11"
-    },
-    {
-        "type": "inline",
-        "contents": "{\"package\": \"aeda16ab4059c5fd2a83f2b9c9e9c981327b18aa8e3b313f7e6563799d4f093e\", \"files\": {}}",
-        "dest": "cargo/vendor/dissimilar-1.0.11",
-        "dest-filename": ".cargo-checksum.json"
-    },
-    {
-        "type": "archive",
-        "archive-type": "tar-gzip",
         "url": "https://static.crates.io/crates/dlib/dlib-0.5.3.crate",
         "sha256": "ab8ecd87370524b461f8557c119c405552c396ed91fc0a8eec68679eab26f94a",
         "dest": "cargo/vendor/dlib-0.5.3"
