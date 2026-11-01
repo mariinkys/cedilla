@@ -82,9 +82,9 @@ impl AppModel {
                 is_dirty: true,
                 history: HistoryState::default(),
                 scroll: EditorScrollState {
-                    // pre-absorb the programmatic resets we're about to fire
-                    pending_editor_scrolls: 1,
-                    pending_preview_scrolls: 1,
+                    // the scroll-to-top resets we're about to fire
+                    expected_editor_y: Some(0.0),
+                    expected_preview_y: Some(0.0),
                     ..EditorScrollState::default()
                 },
                 search: EditorSearchState::default(),
@@ -146,9 +146,9 @@ impl AppModel {
                 is_dirty: true,
                 history: HistoryState::default(),
                 scroll: EditorScrollState {
-                    // pre-absorb the programmatic resets we're about to fire
-                    pending_editor_scrolls: 1,
-                    pending_preview_scrolls: 1,
+                    // the scroll-to-top resets we're about to fire
+                    expected_editor_y: Some(0.0),
+                    expected_preview_y: Some(0.0),
                     ..EditorScrollState::default()
                 },
                 search: EditorSearchState::default(),
@@ -271,9 +271,9 @@ impl AppModel {
                         is_dirty: false,
                         history: HistoryState::new_with_content(content.to_string()),
                         scroll: EditorScrollState {
-                            // pre-absorb the programmatic resets we're about to fire
-                            pending_editor_scrolls: 1,
-                            pending_preview_scrolls: 1,
+                            // the scroll-to-top resets we're about to fire
+                            expected_editor_y: Some(0.0),
+                            expected_preview_y: Some(0.0),
                             ..EditorScrollState::default()
                         },
                         search: EditorSearchState::default(),

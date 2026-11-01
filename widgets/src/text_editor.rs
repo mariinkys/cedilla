@@ -457,6 +457,30 @@ where
         self.0.borrow().editor.line_count()
     }
 
+    /// Returns the vertical position (in pixels, from the top of the text) of the cursor.
+    ///
+    /// Unlike `cursor().position.line`, this accounts for wrapped lines.
+    pub fn cursor_y(&self) -> f32 {
+        let internal = self.0.borrow();
+
+        match internal.editor.selection() {
+            Selection::Caret(position) => position.y,
+            Selection::Range(ranges) => {
+                // the cursor is at the end of the selection that's not the anchor
+                let cursor = internal.editor.cursor();
+                let cursor_after_anchor = cursor.selection.is_some_and(|anchor| {
+                    (anchor.line, anchor.column) < (cursor.position.line, cursor.position.column)
+                });
+                let range = if cursor_after_anchor {
+                    ranges.last()
+                } else {
+                    ranges.first()
+                };
+                range.map(|r| r.y).unwrap_or_default()
+            }
+        }
+    }
+
     /// Returns the text of the line at the given index, if it exists.
     pub fn line(&self, index: usize) -> Option<Line<'_>> {
         let internal = self.0.borrow();
