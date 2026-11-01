@@ -29,7 +29,6 @@ slotmap.workspace = true
 percent-encoding.workspace = true
 reqwest.workspace = true
 url.workspace = true
-dissimilar.workspace = true
 icu_collator.workspace = true
 icu_locale.workspace = true
 font-kit.workspace = true
@@ -75,7 +74,6 @@ url = "2.5.8"
 base64 = "0.23.1"
 regex = "1.13.1"
 pulldown-cmark = "0.13.6"
-dissimilar = "1.0.11"
 gotenberg_pdf = { version = "0.6.0" }
 font-kit = "0.14.3"
 image = { version = "0.25.10", default-features = false, features = ["png"] }

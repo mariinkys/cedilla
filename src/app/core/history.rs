@@ -1,53 +1,34 @@
-use dissimilar::Chunk;
-
-/// Holds the state of the File History
+/// Holds the state of the File History.
+///
+/// Stores full snapshots: Markdown notes are small, so a copy per step (capped at
+/// [`MAX_HISTORY`]) is cheaper than diffing the whole document on every keystroke.
 #[derive(Default)]
 pub struct HistoryState {
+    /// Text before the oldest undo step
     pub history_base: String,
-    pub history_patches: Vec<Vec<dissimilar::Chunk<'static>>>,
+    /// `history_snapshots[i]` is the text after edit `i`
+    pub history_snapshots: Vec<String>,
+    /// How many edits are currently applied (0 = `history_base`)
     pub history_index: usize,
-    pub cursor_before: Vec<(usize, usize)>, // cursor before patch[i] was applied
-    pub cursor_after: Vec<(usize, usize)>,  // cursor after patch[i] was applied
+    pub cursor_before: Vec<(usize, usize)>, // cursor before edit i
+    pub cursor_after: Vec<(usize, usize)>,  // cursor after edit i
 }
+
+pub const MAX_HISTORY: usize = 100;
 
 impl HistoryState {
     pub fn new_with_content(content: String) -> Self {
         Self {
             history_base: content,
-            history_patches: Vec::new(),
-            history_index: 0,
-            cursor_before: Vec::new(),
-            cursor_after: Vec::new(),
+            ..Self::default()
         }
     }
-}
 
-/// Compute a patch (list of chunks) from `old` → `new`
-pub fn make_patch(old: &str, new: &str) -> Vec<Chunk<'static>> {
-    dissimilar::diff(old, new)
-        .into_iter()
-        .map(|chunk| match chunk {
-            Chunk::Equal(s) => Chunk::Equal(Box::leak(s.to_string().into_boxed_str())),
-            Chunk::Insert(s) => Chunk::Insert(Box::leak(s.to_string().into_boxed_str())),
-            Chunk::Delete(s) => Chunk::Delete(Box::leak(s.to_string().into_boxed_str())),
-        })
-        .collect()
-}
-
-/// Apply a forward patch to `base`, reconstructing the text at that snapshot.
-pub fn apply_patch(base: &str, patches: &[Vec<Chunk<'static>>]) -> String {
-    patches.iter().fold(base.to_string(), |current, patch| {
-        apply_single(&current, patch)
-    })
-}
-
-pub fn apply_single(text: &str, patch: &[Chunk<'static>]) -> String {
-    let mut result = String::with_capacity(text.len());
-    for chunk in patch {
-        match chunk {
-            Chunk::Equal(s) | Chunk::Insert(s) => result.push_str(s),
-            Chunk::Delete(_) => {}
+    /// Text with the first `index` edits applied (0 = base).
+    pub fn snapshot(&self, index: usize) -> &str {
+        match index {
+            0 => &self.history_base,
+            i => &self.history_snapshots[i - 1],
         }
     }
-    result
 }
