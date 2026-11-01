@@ -154,6 +154,15 @@
   </keywords>
 
   <releases>
+    <release version="0.1.14" date="2026-11-01">
+        <description>
+            <p>Fixed issue that prevented Copy and Paste from working correctly on Wayland</p>
+            <p>Improved navbar handling and behavior</p>
+            <p>Improved scroll-sync handling and behavior</p>
+            <p>Various performance tweaks and improvments</p>
+            <p>Updated dependencies</p>
+        </description>
+    </release>
     <release version="0.1.13" date="2026-10-03">
         <description>
             <p>Added Mermaid Diagrams support</p>

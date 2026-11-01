@@ -786,7 +786,7 @@ dependencies = [
 
 [[package]]
 name = "cedilla"
-version = "0.1.13"
+version = "0.1.14"
 dependencies = [
  "anywho",
  "base64 0.23.1",
