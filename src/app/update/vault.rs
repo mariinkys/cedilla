@@ -1,34 +1,22 @@
 // SPDX-License-Identifier: GPL-3.0
 
-use crate::app::core::project::{ProjectNode, canonical, remap_path};
+use crate::app::core::project::{canonical, remap_path};
 use crate::app::core::utils::{self, CedillaToast};
 use crate::app::{AppModel, Message, State};
 use cosmic::prelude::*;
-use cosmic::widget::segmented_button;
 use std::path::PathBuf;
 
 impl AppModel {
-    pub fn handle_delete_node(
-        &mut self,
-        entity: segmented_button::Entity,
-    ) -> Task<cosmic::Action<Message>> {
+    pub fn handle_delete_node(&mut self, path: PathBuf) -> Task<cosmic::Action<Message>> {
         let State::Ready { editor, .. } = &mut self.state else {
             return Task::none();
         };
 
-        let Some(node) = self.nav_model.data::<ProjectNode>(entity).cloned() else {
-            return Task::none();
-        };
-
-        let path = match &node {
-            ProjectNode::File { path, .. } => path.clone(),
-            ProjectNode::Folder { path, .. } => path.clone(),
-        };
-
         editor.ignore_next_external_change = true;
-        let delete_result = match &node {
-            ProjectNode::File { .. } => std::fs::remove_file(&path),
-            ProjectNode::Folder { .. } => std::fs::remove_dir_all(&path),
+        let delete_result = if path.is_dir() {
+            std::fs::remove_dir_all(&path)
+        } else {
+            std::fs::remove_file(&path)
         };
 
         if let Err(e) = delete_result {
@@ -54,30 +42,17 @@ impl AppModel {
 
     pub fn handle_rename_node(
         &mut self,
-        entity: segmented_button::Entity,
+        old_path: PathBuf,
         new_name: String,
     ) -> Task<cosmic::Action<Message>> {
         let State::Ready { editor, .. } = &mut self.state else {
             return Task::none();
         };
 
-        let Some(node) = self.nav_model.data::<ProjectNode>(entity).cloned() else {
-            return Task::none();
-        };
-
-        let old_path = match &node {
-            ProjectNode::File { path, .. } | ProjectNode::Folder { path, .. } => path.clone(),
-        };
-
-        let new_name = match &node {
-            ProjectNode::File { .. } => {
-                if new_name.ends_with(".md") {
-                    new_name
-                } else {
-                    format!("{}.md", new_name)
-                }
-            }
-            ProjectNode::Folder { .. } => new_name,
+        let new_name = if old_path.is_dir() || new_name.ends_with(".md") {
+            new_name
+        } else {
+            format!("{}.md", new_name)
         };
 
         let new_path = match old_path.parent() {
@@ -119,16 +94,11 @@ impl AppModel {
 
     pub fn handle_move_node(
         &mut self,
-        source_entity: segmented_button::Entity,
+        source_path: PathBuf,
         target_path: PathBuf,
     ) -> Task<cosmic::Action<Message>> {
         let State::Ready { editor, .. } = &mut self.state else {
             return Task::none();
-        };
-
-        let source_path = match self.nav_model.data::<ProjectNode>(source_entity) {
-            Some(ProjectNode::File { path, .. } | ProjectNode::Folder { path, .. }) => path.clone(),
-            None => return Task::none(),
         };
 
         let file_name = match source_path.file_name() {

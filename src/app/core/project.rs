@@ -149,14 +149,9 @@ impl AppModel {
     pub fn collect_all_folders(
         &self,
         vault_path: &PathBuf,
-        exclude_entity: cosmic::widget::segmented_button::Entity,
+        exclude_path: &Path,
     ) -> Vec<(PathBuf, String, u16)> {
-        let exclude_path = self
-            .nav_model
-            .data::<ProjectNode>(exclude_entity)
-            .map(|n| match n {
-                ProjectNode::Folder { path, .. } | ProjectNode::File { path, .. } => path.clone(),
-            });
+        let exclude_path = Some(exclude_path.to_path_buf());
 
         let mut result = Vec::new();
 

@@ -27,7 +27,6 @@ use cosmic::widget::{
 };
 use cosmic::{cosmic_config, prelude::*, surface, theme};
 use frostmark::{MarkWidget, UpdateMsg};
-use slotmap::Key as SlotMapKey;
 use std::any::TypeId;
 use std::collections::{HashMap, HashSet, VecDeque};
 use std::path::{Path, PathBuf};
@@ -51,8 +50,8 @@ pub struct AppModel {
     core: cosmic::Core,
     /// Application navbar
     nav_model: segmented_button::SingleSelectModel,
-    /// Needed for navbar context menu func
-    nav_bar_context_id: segmented_button::Entity,
+    /// Path of the navbar item that was last right clicked (fallback for the context menu actions)
+    nav_context_path: Option<PathBuf>,
     /// Dialog Pages of the Application
     dialog_pages: VecDeque<DialogPage>,
     /// Holds the state of the application dialogs
@@ -173,12 +172,12 @@ pub enum Message {
     /// Fired when the watcher detects an external change to the open file
     ExternalFileChanged(PathBuf),
 
-    /// Deletes the given node entity of the navbar folder or file
-    DeleteNode(cosmic::widget::segmented_button::Entity),
-    /// Renames the given node entity of the navbar folder or file
-    RenameNode(cosmic::widget::segmented_button::Entity, String),
-    /// Move one node (to another one)
-    MoveNode(cosmic::widget::segmented_button::Entity, PathBuf),
+    /// Deletes the given vault folder or file
+    DeleteNode(PathBuf),
+    /// Renames the given vault folder or file
+    RenameNode(PathBuf, String),
+    /// Moves the given vault folder or file into the target folder
+    MoveNode(PathBuf, PathBuf),
     /// Ask to move the main vault to another path
     MoveVault,
     /// Callback after asking to move the vault
@@ -307,7 +306,7 @@ impl cosmic::Application for AppModel {
             toasts: Toasts::new(Message::CloseToast),
             core,
             nav_model: nav_bar::Model::builder().build(),
-            nav_bar_context_id: segmented_button::Entity::null(),
+            nav_context_path: None,
             context_page: ContextPage::default(),
             dialog_pages: VecDeque::default(),
             dialog_state: DialogState::default(),
@@ -729,9 +728,9 @@ impl cosmic::Application for AppModel {
             Message::ExternalFileChanged(path) => self.handle_external_file_changed(path),
 
             // Vault / Node
-            Message::DeleteNode(entity) => self.handle_delete_node(entity),
-            Message::RenameNode(entity, name) => self.handle_rename_node(entity, name),
-            Message::MoveNode(entity, path) => self.handle_move_node(entity, path),
+            Message::DeleteNode(path) => self.handle_delete_node(path),
+            Message::RenameNode(path, name) => self.handle_rename_node(path, name),
+            Message::MoveNode(path, target) => self.handle_move_node(path, target),
             Message::MoveVault => self.handle_move_vault(),
             Message::VaultMoved(result) => self.handle_vault_moved(result),
 

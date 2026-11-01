@@ -1,10 +1,11 @@
 // SPDX-License-Identifier: GPL-3.0
 
+use crate::app::core::project::ProjectNode;
 use crate::app::dialogs;
 use crate::app::{AppModel, Message, NavMenuAction, State};
 use cosmic::prelude::*;
 use cosmic::widget::segmented_button;
-use slotmap::Key as SlotmapKey;
+use std::path::{Path, PathBuf};
 
 impl AppModel {
     pub fn handle_dialog_action(
@@ -22,7 +23,9 @@ impl AppModel {
         &mut self,
         entity: segmented_button::Entity,
     ) -> Task<cosmic::Action<Message>> {
-        self.nav_bar_context_id = entity;
+        // remember the path now: if the navbar gets rebuilt before a menu item is chosen,
+        // the entity in that menu item is no longer valid
+        self.nav_context_path = self.nav_node_path(entity);
         Task::none()
     }
 
@@ -30,81 +33,63 @@ impl AppModel {
         &mut self,
         action: NavMenuAction,
     ) -> Task<cosmic::Action<Message>> {
-        self.nav_bar_context_id = segmented_button::Entity::null();
+        let entity = match action {
+            NavMenuAction::DeleteNode(e)
+            | NavMenuAction::RenameNode(e)
+            | NavMenuAction::MoveNode(e)
+            | NavMenuAction::OpenNodeFileManager(e)
+            | NavMenuAction::OpenFolderCreationDialog(e)
+            | NavMenuAction::OpenVaultFileCreationDialog(e) => e,
+        };
+
+        let Some(path) = self
+            .nav_node_path(entity)
+            .or_else(|| self.nav_context_path.take())
+        else {
+            return Task::none();
+        };
+        self.nav_context_path = None;
+
+        // creation dialogs and "open in file manager" act on the folder (a file's parent)
+        let folder = if path.is_dir() {
+            path.clone()
+        } else {
+            // a file should always have a parent
+            path.parent()
+                .map(Path::to_path_buf)
+                .unwrap_or_else(|| path.clone())
+        };
 
         match action {
-            NavMenuAction::DeleteNode(entity) => {
-                self.handle_dialog_action(dialogs::DialogAction::OpenDeleteNodeDialog(entity))
+            NavMenuAction::DeleteNode(_) => {
+                self.handle_dialog_action(dialogs::DialogAction::OpenDeleteNodeDialog(path))
             }
-            NavMenuAction::RenameNode(entity) => {
-                self.handle_dialog_action(dialogs::DialogAction::OpenRenameNodeDialog(entity))
+            NavMenuAction::RenameNode(_) => {
+                self.handle_dialog_action(dialogs::DialogAction::OpenRenameNodeDialog(path))
             }
-            NavMenuAction::MoveNode(entity) => {
+            NavMenuAction::MoveNode(_) => {
                 let vault_path = self.config.vault_path();
-                self.dialog_state.available_folders = self.collect_all_folders(&vault_path, entity);
+                self.dialog_state.available_folders = self.collect_all_folders(&vault_path, &path);
 
-                self.handle_dialog_action(dialogs::DialogAction::OpenMoveNodeDialog(entity))
+                self.handle_dialog_action(dialogs::DialogAction::OpenMoveNodeDialog(path))
             }
-            NavMenuAction::OpenNodeFileManager(entity) => {
-                if let Some(entity) = self
-                    .nav_model
-                    .data::<crate::app::core::project::ProjectNode>(entity)
-                {
-                    let path = match entity {
-                        crate::app::core::project::ProjectNode::Folder { path, .. } => path,
-                        crate::app::core::project::ProjectNode::File { path, .. } => {
-                            // a file should always have a parent
-                            path.parent().unwrap()
-                        }
-                    };
+            NavMenuAction::OpenNodeFileManager(_) => self.handle_open_in_file_explorer(&folder),
+            NavMenuAction::OpenFolderCreationDialog(_) => {
+                // the context menu click doesn't go through on_nav_select, so set the target here
+                self.selected_nav_path = Some(folder);
+                self.handle_dialog_action(dialogs::DialogAction::OpenNewVaultFolderDialog)
+            }
+            NavMenuAction::OpenVaultFileCreationDialog(_) => {
+                self.selected_nav_path = Some(folder);
+                self.handle_dialog_action(dialogs::DialogAction::OpenNewVaultFileDialog)
+            }
+        }
+    }
 
-                    self.handle_open_in_file_explorer(path)
-                } else {
-                    Task::none()
-                }
-            }
-            NavMenuAction::OpenFolderCreationDialog(entity) => {
-                if let Some(entity) = self
-                    .nav_model
-                    .data::<crate::app::core::project::ProjectNode>(entity)
-                {
-                    let path = match entity {
-                        crate::app::core::project::ProjectNode::Folder { path, .. } => path,
-                        crate::app::core::project::ProjectNode::File { path, .. } => {
-                            // a file should always have a parent
-                            path.parent().unwrap()
-                        }
-                    };
-
-                    // we update the selected nav path becasue the context menu click does not update it so
-                    // if the user hasn't left clicked first it has not updated
-                    self.selected_nav_path = Some(path.to_path_buf());
-                    self.handle_dialog_action(dialogs::DialogAction::OpenNewVaultFolderDialog)
-                } else {
-                    Task::none()
-                }
-            }
-            NavMenuAction::OpenVaultFileCreationDialog(entity) => {
-                if let Some(entity) = self
-                    .nav_model
-                    .data::<crate::app::core::project::ProjectNode>(entity)
-                {
-                    let path = match entity {
-                        crate::app::core::project::ProjectNode::Folder { path, .. } => path,
-                        crate::app::core::project::ProjectNode::File { path, .. } => {
-                            // a file should always have a parent
-                            path.parent().unwrap()
-                        }
-                    };
-
-                    // we update the selected nav path becasue the context menu click does not update it so
-                    // if the user hasn't left clicked first it has not updated
-                    self.selected_nav_path = Some(path.to_path_buf());
-                    self.handle_dialog_action(dialogs::DialogAction::OpenNewVaultFileDialog)
-                } else {
-                    Task::none()
-                }
-            }
+    /// Path of a navbar entry, `None` if the entity no longer exists.
+    fn nav_node_path(&self, entity: segmented_button::Entity) -> Option<PathBuf> {
+        match self.nav_model.data::<ProjectNode>(entity)? {
+            ProjectNode::File { path, .. } | ProjectNode::Folder { path, .. } => Some(path.clone()),
         }
     }
 }
