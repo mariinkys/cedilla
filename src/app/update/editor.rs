@@ -24,6 +24,11 @@ impl AppModel {
         };
 
         let was_edit = action.is_edit();
+        // keyboard navigation (arrows, Home/End, PageUp/Down, with or without Shift)
+        let moves_cursor = matches!(
+            action,
+            text_editor::Action::Move(_) | text_editor::Action::Select(_)
+        );
         let cursor_before = editor.content.cursor().position;
 
         if let text_editor::Action::Edit(text_editor::Edit::Enter) = &action {
@@ -37,7 +42,12 @@ impl AppModel {
         // clicks, selections, cursor moves and scrolling don't change the text:
         // no need to re-render the preview or record history for them
         if !was_edit {
-            return Task::none();
+            // but moving the cursor with the keyboard should keep it on screen
+            return if moves_cursor {
+                ensure_cursor_visible()
+            } else {
+                Task::none()
+            };
         }
 
         let text = editor.content.text();
@@ -46,8 +56,7 @@ impl AppModel {
         editor.is_dirty = true;
         editor.push_history_text((cursor_before.line, cursor_before.column), text);
 
-        let sync_preview = self.config.scrollbar_sync == BoolState::Yes;
-        let cursor_task = ensure_cursor_visible(editor, sync_preview);
+        let cursor_task = ensure_cursor_visible();
 
         utils::images::download_images(
             &mut preview.markstate,
@@ -171,8 +180,7 @@ impl AppModel {
         editor.push_history((cursor_before.line, cursor_before.column));
         preview.update_content(editor.content.text().as_ref());
 
-        let sync_preview = self.config.scrollbar_sync == BoolState::Yes;
-        let cursor_task = ensure_cursor_visible(editor, sync_preview);
+        let cursor_task = ensure_cursor_visible();
 
         utils::images::download_images(
             &mut preview.markstate,
@@ -201,8 +209,7 @@ impl AppModel {
         editor.push_history((cursor_before.line, cursor_before.column));
         preview.update_content(editor.content.text().as_ref());
 
-        let sync_preview = self.config.scrollbar_sync == BoolState::Yes;
-        ensure_cursor_visible(editor, sync_preview)
+        ensure_cursor_visible()
     }
 
     fn no_image_in_clipboard_toast(&mut self) -> Task<cosmic::Action<Message>> {
@@ -256,6 +263,15 @@ impl AppModel {
         Task::none()
     }
 
+    pub fn handle_ensure_cursor_visible(&mut self) -> Task<cosmic::Action<Message>> {
+        let State::Ready { editor, .. } = &mut self.state else {
+            return Task::none();
+        };
+
+        let sync_preview = self.config.scrollbar_sync == BoolState::Yes;
+        scroll_to_cursor(editor, sync_preview)
+    }
+
     pub fn handle_undo(&mut self) -> Task<cosmic::Action<Message>> {
         let State::Ready {
             editor, preview, ..
@@ -266,11 +282,14 @@ impl AppModel {
 
         editor.undo(preview);
 
+        let cursor_task = ensure_cursor_visible();
+
         utils::images::download_images(
             &mut preview.markstate,
             &mut preview.images_in_progress,
             &editor.path,
         )
+        .chain(cursor_task)
     }
 
     pub fn handle_redo(&mut self) -> Task<cosmic::Action<Message>> {
@@ -283,11 +302,14 @@ impl AppModel {
 
         editor.redo(preview);
 
+        let cursor_task = ensure_cursor_visible();
+
         utils::images::download_images(
             &mut preview.markstate,
             &mut preview.images_in_progress,
             &editor.path,
         )
+        .chain(cursor_task)
     }
 
     pub fn handle_search(&mut self, action: SearchAction) -> Task<cosmic::Action<Message>> {
@@ -295,16 +317,13 @@ impl AppModel {
             return Task::none();
         };
 
-        let sync_preview = self.config.scrollbar_sync == BoolState::Yes;
-
         match action {
             SearchAction::ToggleSearch => {
                 editor.search.show_search_box = !editor.search.show_search_box;
                 // clear state when closing
                 if !editor.search.show_search_box {
                     editor.search = EditorSearchState::default();
-                    widgets::text_editor::focus(text_editor_id())
-                        .chain(ensure_cursor_visible(editor, sync_preview))
+                    widgets::text_editor::focus(text_editor_id()).chain(ensure_cursor_visible())
                 } else {
                     cosmic::widget::text_input::focus(search_input_id())
                 }
@@ -316,7 +335,7 @@ impl AppModel {
 
                 if let Some(idx) = editor.search.current_match_index {
                     editor.navigate_to_match(&editor.search.matches[idx].clone());
-                    ensure_cursor_visible(editor, sync_preview)
+                    ensure_cursor_visible()
                 } else {
                     Task::none()
                 }
@@ -328,7 +347,7 @@ impl AppModel {
 
                 if let Some(idx) = editor.search.current_match_index {
                     editor.navigate_to_match(&editor.search.matches[idx].clone());
-                    ensure_cursor_visible(editor, sync_preview)
+                    ensure_cursor_visible()
                 } else {
                     Task::none()
                 }
@@ -337,7 +356,7 @@ impl AppModel {
             SearchAction::NextResult => {
                 if let Some(m) = editor.search.next_match().cloned() {
                     editor.navigate_to_match(&m);
-                    ensure_cursor_visible(editor, sync_preview)
+                    ensure_cursor_visible()
                 } else {
                     Task::none()
                 }
@@ -346,7 +365,7 @@ impl AppModel {
             SearchAction::PrevResult => {
                 if let Some(m) = editor.search.prev_match().cloned() {
                     editor.navigate_to_match(&m);
-                    ensure_cursor_visible(editor, sync_preview)
+                    ensure_cursor_visible()
                 } else {
                     Task::none()
                 }
@@ -357,11 +376,17 @@ impl AppModel {
     }
 }
 
+/// Scrolls the editor so the cursor stays visible, once the current changes are laid out.
+///
+/// The editor only lays out (shapes) its text during the widget layout pass, so right after an
+/// edit (and especially after undo/redo, which replace the whole text) the caret position isn't
+/// known yet. Sending a message defers the work until after the next layout.
+fn ensure_cursor_visible() -> Task<cosmic::Action<Message>> {
+    Task::done(cosmic::action::app(Message::EnsureCursorVisible))
+}
+
 /// Scrolls the editor (and the preview, if synced) so the cursor stays visible.
-fn ensure_cursor_visible(
-    editor: &mut EditorState,
-    sync_preview: bool,
-) -> Task<cosmic::Action<Message>> {
+fn scroll_to_cursor(editor: &mut EditorState, sync_preview: bool) -> Task<cosmic::Action<Message>> {
     let Some(editor_vp) = editor.scroll.last_editor_viewport else {
         return Task::none();
     };

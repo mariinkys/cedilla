@@ -191,6 +191,8 @@ pub enum Message {
     Undo,
     /// Redo requested
     Redo,
+    /// Scroll the editor to the cursor (sent after edits, once the text is laid out)
+    EnsureCursorVisible,
     /// Search related action requested
     Search(SearchAction),
     /// Smart paste (pastes images as Markdown or standard text)
@@ -739,6 +741,7 @@ impl cosmic::Application for AppModel {
             Message::ApplyFormatting(action) => self.handle_apply_formatting(action),
             Message::Undo => self.handle_undo(),
             Message::Redo => self.handle_redo(),
+            Message::EnsureCursorVisible => self.handle_ensure_cursor_visible(),
             Message::Search(action) => self.handle_search(action),
             Message::SmartPaste => self.handle_smart_paste(),
             Message::ClipboardData(mode, content) => self.handle_clipboard_data(mode, content),
