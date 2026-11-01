@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0
 
 use crate::app::core::utils::Image;
+use crate::app::core::utils::scroll::{ScrollOrigin, abs, classify, proportional_y};
 use crate::app::{
     AppModel, Message, PreviewState, State, editor_scrollable_id, preview_scrollable_id,
 };
@@ -95,73 +96,46 @@ impl AppModel {
             return Task::none();
         };
 
-        let is_editor = source_id == editor_scrollable_id();
-        let is_preview = source_id == preview_scrollable_id();
+        let sync = self.config.scrollbar_sync == BoolState::Yes;
+        let scroll = &mut editor.scroll;
+        let new_y = viewport.absolute_offset().y;
 
-        if is_editor {
-            editor.scroll.last_editor_viewport = Some(viewport);
+        if source_id == editor_scrollable_id() {
+            let last_y = scroll.last_editor_viewport.map(|vp| vp.absolute_offset().y);
+            let origin = classify(last_y, new_y, &mut scroll.expected_editor_y);
+            scroll.last_editor_viewport = Some(viewport);
 
-            // programmatic scroll we fired, consume it and skip sync
-            if editor.scroll.pending_editor_scrolls > 0 {
-                editor.scroll.pending_editor_scrolls -= 1;
+            // only the user scrolling the editor moves the preview
+            if origin != ScrollOrigin::User || !sync {
                 return Task::none();
             }
-
-            // user initiated editor scroll, check if we need to sync
-            if self.config.scrollbar_sync != BoolState::Yes {
-                return Task::none();
-            }
-
-            // we have a viewport?
-            let Some(preview_vp) = editor.scroll.last_preview_viewport else {
+            let Some(preview_vp) = scroll.last_preview_viewport else {
                 return Task::none();
             };
 
-            let target_y = crate::app::utils::scroll::proportional_y(viewport, preview_vp);
-            editor.scroll.pending_preview_scrolls += 1;
-            return scroll_to(
-                preview_scrollable_id(),
-                crate::app::utils::scroll::abs(target_y),
-            )
-            .map(cosmic::action::app);
+            let target_y = proportional_y(viewport, preview_vp);
+            scroll.expected_preview_y = Some(target_y);
+            return scroll_to(preview_scrollable_id(), abs(target_y)).map(cosmic::action::app);
         }
 
-        if is_preview {
-            let prev_height = editor.scroll.last_preview_content_height;
-            let new_height = viewport.content_bounds().height;
+        if source_id == preview_scrollable_id() {
+            let last_y = scroll
+                .last_preview_viewport
+                .map(|vp| vp.absolute_offset().y);
+            let origin = classify(last_y, new_y, &mut scroll.expected_preview_y);
+            scroll.last_preview_viewport = Some(viewport);
 
-            editor.scroll.last_preview_viewport = Some(viewport);
-            editor.scroll.last_preview_content_height = new_height;
-
-            // programmatic scroll we fired, consume it and skip sync
-            if editor.scroll.pending_preview_scrolls > 0 {
-                editor.scroll.pending_preview_scrolls -= 1;
+            // only the user scrolling the preview moves the editor
+            if origin != ScrollOrigin::User || !sync {
                 return Task::none();
             }
-
-            // Content height changed, this is a reflow from images/fonts loading,
-            // not a user scroll. Ignore it to avoid snapping the editor.
-            if (prev_height - new_height).abs() > 1.0 {
-                return Task::none();
-            }
-
-            // user initiated preview scroll, check if we need to sync
-            if self.config.scrollbar_sync != BoolState::Yes {
-                return Task::none();
-            }
-
-            // we have a viewport?
-            let Some(editor_vp) = editor.scroll.last_editor_viewport else {
+            let Some(editor_vp) = scroll.last_editor_viewport else {
                 return Task::none();
             };
 
-            let target_y = crate::app::utils::scroll::proportional_y(viewport, editor_vp);
-            editor.scroll.pending_editor_scrolls += 1;
-            return scroll_to(
-                editor_scrollable_id(),
-                crate::app::utils::scroll::abs(target_y),
-            )
-            .map(cosmic::action::app);
+            let target_y = proportional_y(viewport, editor_vp);
+            scroll.expected_editor_y = Some(target_y);
+            return scroll_to(editor_scrollable_id(), abs(target_y)).map(cosmic::action::app);
         }
 
         Task::none()

@@ -356,7 +356,7 @@ impl AppModel {
     }
 }
 
-/// Scrolls the editor to keep the cursor visible.
+/// Scrolls the editor (and the preview, if synced) so the cursor stays visible.
 fn ensure_cursor_visible(
     editor: &mut EditorState,
     sync_preview: bool,
@@ -365,29 +365,42 @@ fn ensure_cursor_visible(
         return Task::none();
     };
 
-    let total_lines = editor.content.line_count().max(1);
-    let cursor_line = editor.content.cursor().position.line;
-    let content_height = editor_vp.content_bounds().height;
     let viewport_height = editor_vp.bounds().height;
-    let line_height = content_height / total_lines as f32;
-    let cursor_top = cursor_line as f32 * line_height;
-    let cursor_bottom = cursor_top + line_height;
+    let max_editor_y = utils::scroll::max_y(editor_vp);
     let scroll_y = editor_vp.absolute_offset().y;
-    let padding = line_height * 3.0;
+
+    // real caret position, so wrapped lines are accounted for
+    let cursor_top = editor.content.cursor_y();
+
+    // approximate line height (only used for the cursor height and the margin around it)
+    let total_lines = editor.content.line_count().max(1);
+    let line_height = (editor_vp.content_bounds().height / total_lines as f32).max(1.0);
+    let cursor_bottom = cursor_top + line_height;
+
+    // keep a few lines of margin, but never so much that both conditions can be true at once
+    let padding = (line_height * 3.0).min(((viewport_height - line_height) / 2.0).max(0.0));
 
     let new_editor_y = if cursor_top < scroll_y + padding {
         // cursor above visible area
-        (cursor_top - padding).max(0.0)
+        cursor_top - padding
     } else if cursor_bottom > scroll_y + viewport_height - padding {
         // cursor below visible area
         cursor_bottom + padding - viewport_height
     } else {
         // already visible, nothing to do
         return Task::none();
-    };
+    }
+    // no upper clamp: this runs before the edit is laid out, so `max_editor_y` is still the old
+    // one (e.g. Enter on the last line). Iced clamps to the new content height itself.
+    .max(0.0);
 
-    // scroll editor, marking it as programmatic so it isn't re-synced via on_scroll
-    editor.scroll.pending_editor_scrolls += 1;
+    // nothing would move (e.g. cursor at the very end of the document)
+    if (new_editor_y - scroll_y).abs() < 0.5 {
+        return Task::none();
+    }
+
+    // remember where we're going so the notification isn't treated as a user scroll
+    editor.scroll.expected_editor_y = Some(new_editor_y);
     let editor_task = scroll_to(editor_scrollable_id(), utils::scroll::abs(new_editor_y))
         .map(cosmic::action::app);
 
@@ -395,21 +408,18 @@ fn ensure_cursor_visible(
     if let Some(preview_vp) = editor.scroll.last_preview_viewport
         && sync_preview
     {
-        let editor_scrollable = (content_height - viewport_height).max(0.0);
-        let rel = if editor_scrollable > 0.0 {
-            new_editor_y / editor_scrollable
+        let rel = if max_editor_y > 0.0 {
+            (new_editor_y / max_editor_y).min(1.0)
         } else {
             0.0
         };
-        let preview_scrollable =
-            (preview_vp.content_bounds().height - preview_vp.bounds().height).max(0.0);
-        let new_preview_y = (rel * preview_scrollable).max(0.0);
+        let new_preview_y = rel * utils::scroll::max_y(preview_vp);
 
-        editor.scroll.pending_preview_scrolls += 1;
+        editor.scroll.expected_preview_y = Some(new_preview_y);
         let preview_task = scroll_to(preview_scrollable_id(), utils::scroll::abs(new_preview_y))
             .map(cosmic::action::app);
 
-        return editor_task.chain(preview_task);
+        return Task::batch([editor_task, preview_task]);
     }
 
     editor_task
