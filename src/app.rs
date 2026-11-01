@@ -4,7 +4,7 @@ use crate::app::app_menu::MenuAction;
 use crate::app::context_page::ContextPage;
 use crate::app::core::editor::EditorState;
 use crate::app::core::preview::MarkdownPreview;
-use crate::app::core::project::ProjectNode;
+use crate::app::core::project::{ProjectNode, canonical};
 use crate::app::core::utils::clipboard::{ClipboardContent, PasteMode};
 use crate::app::core::utils::search::SearchAction;
 use crate::app::core::utils::{self, CedillaToast, Image};
@@ -29,7 +29,7 @@ use cosmic::{cosmic_config, prelude::*, surface, theme};
 use frostmark::{MarkWidget, UpdateMsg};
 use slotmap::Key as SlotMapKey;
 use std::any::TypeId;
-use std::collections::{HashMap, VecDeque};
+use std::collections::{HashMap, HashSet, VecDeque};
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
 use widgets::{TextEditor, text_editor};
@@ -79,6 +79,8 @@ pub struct AppModel {
     highlighter_themes: Vec<String>,
     /// Currently selected path on the navbar (i need these for accurate file creadtion deletion...)
     selected_nav_path: Option<PathBuf>,
+    /// Folders expanded in the navbar (canonical paths, the vault root included)
+    expanded_folders: HashSet<PathBuf>,
     /// Gotenberg client, needed for Pdf exporting
     gotenberg_client: gotenberg_pdf::Client,
     /// Application State
@@ -322,6 +324,7 @@ impl cosmic::Application for AppModel {
                 .map(|t| t.to_string())
                 .collect(),
             selected_nav_path: None,
+            expanded_folders: HashSet::new(),
             gotenberg_client: gotenberg_pdf::Client::new(&gotenberg_url),
             state: State::Loading,
         };
@@ -334,9 +337,7 @@ impl cosmic::Application for AppModel {
 
         // load vault
         let vault_path = PathBuf::from(&app.config.vault_path);
-        if vault_path.exists() && vault_path.is_dir() {
-            app.open_vault_folder(&vault_path);
-        } else {
+        if !(vault_path.exists() && vault_path.is_dir()) {
             eprintln!("Vault not found, trying to fallback to default path");
             let default_vault_path = PathBuf::from(CedillaConfig::default().vault_path);
 
@@ -351,8 +352,11 @@ impl cosmic::Application for AppModel {
             }
 
             app.config.vault_path = default_vault_path.to_string_lossy().to_string();
-            app.open_vault_folder(&default_vault_path);
         }
+
+        let vault_path = canonical(&app.config.vault_path());
+        app.expanded_folders.insert(vault_path);
+        app.rebuild_nav();
 
         // Startup tasks.
         let tasks = vec![
@@ -533,76 +537,46 @@ impl cosmic::Application for AppModel {
     }
 
     fn on_nav_select(&mut self, id: nav_bar::Id) -> Task<cosmic::Action<Message>> {
-        let State::Ready { editor, .. } = &self.state else {
+        let Some(node) = self.nav_model.data::<ProjectNode>(id).cloned() else {
             return Task::none();
         };
 
-        let node_opt = match self.nav_model.data_mut::<ProjectNode>(id) {
-            Some(node) => {
-                if let ProjectNode::Folder { open, .. } = node {
-                    *open = !*open;
+        match node {
+            ProjectNode::Folder { path, open, .. } => {
+                if open {
+                    self.expanded_folders.remove(&path);
+                } else {
+                    self.expanded_folders.insert(path.clone());
                 }
-                Some(node.clone())
+
+                // new files / folders from the menu go into the last clicked folder
+                self.selected_nav_path = Some(path);
+                self.rebuild_nav();
+                Task::none()
             }
-            None => None,
-        };
+            ProjectNode::File { path, .. } => {
+                let State::Ready { editor, .. } = &self.state else {
+                    return Task::none();
+                };
 
-        match node_opt {
-            Some(node) => {
-                self.nav_model.icon_set(id, node.icon(18));
+                // the highlight only moves once the file is actually opened (see handle_open_file),
+                // so cancelling the "discard changes" dialog leaves it on the current file
+                if editor.path.as_ref() == Some(&path) {
+                    return Task::none();
+                }
 
-                match node {
-                    ProjectNode::Folder { path, open, .. } => {
-                        // store selected directory
-                        self.selected_nav_path = Some(path.clone());
-
-                        let position = self.nav_model.position(id).unwrap_or(0);
-                        let indent = self.nav_model.indent(id).unwrap_or(0);
-
-                        if open {
-                            self.open_folder(&path, position + 1, indent + 1);
-                        } else {
-                            while let Some(child_id) = self.nav_model.entity_at(position + 1) {
-                                if self.nav_model.indent(child_id).unwrap_or(0) > indent {
-                                    self.nav_model.remove(child_id);
-                                } else {
-                                    break;
-                                }
-                            }
-                        }
-                        Task::none()
-                    }
-                    ProjectNode::File { path, .. } => {
-                        // we don't do this here anymore because if the user discard changes... we don't want to change the selected_nav_path
-                        // it's better to do this after opening a file if the path opened is inside the vault
-                        //store parent directory of selected file
-                        //self.selected_nav_path = path.parent().map(|p| p.to_path_buf());
-
-                        if editor.path.as_ref() == Some(&path) {
-                            return Task::none();
-                        }
-
-                        if editor.is_dirty {
-                            if editor.needs_confirmation() {
-                                Task::done(cosmic::action::app(Message::DialogAction(
-                                    dialogs::DialogAction::OpenConfirmCloseFileDialog(
-                                        DiscardChangesAction::OpenFile(path),
-                                    ),
-                                )))
-                            } else {
-                                Task::perform(utils::files::load_file(path), |res| {
-                                    cosmic::action::app(Message::OpenFile(res))
-                                })
-                            }
-                        } else {
-                            Task::perform(utils::files::load_file(path), |res| {
-                                cosmic::action::app(Message::OpenFile(res))
-                            })
-                        }
-                    }
+                if editor.is_dirty && editor.needs_confirmation() {
+                    Task::done(cosmic::action::app(Message::DialogAction(
+                        dialogs::DialogAction::OpenConfirmCloseFileDialog(
+                            DiscardChangesAction::OpenFile(path),
+                        ),
+                    )))
+                } else {
+                    Task::perform(utils::files::load_file(path), |res| {
+                        cosmic::action::app(Message::OpenFile(res))
+                    })
                 }
             }
-            None => Task::none(),
         }
     }
 

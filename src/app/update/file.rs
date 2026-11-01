@@ -3,6 +3,7 @@
 use crate::app::core::editor::{EditorScrollState, EditorSearchState, EditorState};
 use crate::app::core::history::HistoryState;
 use crate::app::core::preview::MarkdownPreview;
+use crate::app::core::project::canonical;
 use crate::app::core::utils::{self, CedillaToast};
 use crate::app::{
     AppModel, Message, PreviewState, State, editor_scrollable_id, preview_scrollable_id,
@@ -99,6 +100,9 @@ impl AppModel {
             preview_state,
         };
 
+        // nothing is open anymore, clear the navbar highlight
+        self.sync_nav_selection();
+
         Task::batch([
             scroll_to(editor_scrollable_id(), crate::app::utils::scroll::abs(0.0))
                 .map(cosmic::action::app),
@@ -132,14 +136,12 @@ impl AppModel {
             return self.handle_add_toast(CedillaToast::new(e));
         }
 
-        self.insert_file_node(&file_path, &dir);
-
         let panes = get_previous_pane_state(self);
         let preview_state = get_previous_preview_state(self);
 
         self.state = State::Ready {
             editor: EditorState {
-                path: Some(file_path),
+                path: Some(file_path.clone()),
                 content: text_editor::Content::new(),
                 is_dirty: true,
                 history: HistoryState::default(),
@@ -161,6 +163,10 @@ impl AppModel {
             panes,
             preview_state,
         };
+
+        // show the new file in the navbar and highlight it
+        self.reveal_in_nav(&file_path);
+        self.rebuild_nav();
 
         Task::batch([
             scroll_to(editor_scrollable_id(), crate::app::utils::scroll::abs(0.0))
@@ -197,8 +203,9 @@ impl AppModel {
             return self.handle_add_toast(CedillaToast::new(e));
         }
 
-        // insert folder to navbar
-        self.insert_folder_node(&folder_path, &dir);
+        // show the new folder in the navbar
+        self.reveal_in_nav(&folder_path);
+        self.rebuild_nav();
 
         Task::none()
     }
@@ -240,11 +247,16 @@ impl AppModel {
     ) -> Task<cosmic::Action<Message>> {
         match result {
             Ok((path, content)) => {
+                let path = canonical(&path);
+
                 // store parent directory of selected file in nav_path only if path is inside vault
-                let vault_path = self.config.vault_path();
+                let vault_path = canonical(&self.config.vault_path());
                 if path.starts_with(&vault_path) {
                     self.selected_nav_path = path.parent().map(|p| p.to_path_buf());
                 }
+
+                // expand the folders down to the file (no-op outside the vault)
+                self.reveal_in_nav(&path);
 
                 let panes = get_previous_pane_state(self);
                 let preview_state = get_previous_preview_state(self);
@@ -285,6 +297,9 @@ impl AppModel {
                     scroll_to(preview_scrollable_id(), crate::app::utils::scroll::abs(0.0))
                         .map(cosmic::action::app);
 
+                // highlight the opened file
+                self.rebuild_nav();
+
                 if let State::Ready {
                     editor, preview, ..
                 } = &mut self.state
@@ -315,8 +330,15 @@ impl AppModel {
                         return Task::none();
                     };
 
-                    editor.path = Some(new_path);
+                    let was_new_file = editor.path.is_none();
+                    editor.path = Some(new_path.clone());
                     editor.is_dirty = false;
+
+                    // a new file saved inside the vault should show up in the navbar
+                    if was_new_file {
+                        self.reveal_in_nav(&new_path);
+                        self.rebuild_nav();
+                    }
 
                     self.handle_add_toast(CedillaToast::new("File Saved!"))
                 }
