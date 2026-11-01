@@ -35,7 +35,6 @@ icu_locale.workspace = true
 font-kit.workspace = true
 grep.workspace = true
 notify.workspace = true
-arboard.workspace = true
 jiff.workspace = true
 
 # PDF Generation Generation
@@ -43,7 +42,6 @@ gotenberg_pdf.workspace = true
 base64.workspace = true
 regex.workspace = true
 pulldown-cmark.workspace = true
-image.workspace = true
 
 # Local Dependencies
 frostmark = { path = "frostmark" }
@@ -83,7 +81,6 @@ font-kit = "0.14.3"
 image = { version = "0.25.10", default-features = false, features = ["png"] }
 grep = "0.4.1"
 notify = "8.2.1"
-arboard = { version = "3.7.0", features = ["wayland-data-control"] }
 jiff = "0.2.38"
 
 [workspace.dependencies.libcosmic]
