@@ -14,6 +14,12 @@ use cosmic::prelude::*;
 use cosmic::widget::text_editor::{Cursor, Position};
 use widgets::text_editor;
 
+/// Documents up to this size (in bytes) re-render the preview on every keystroke.
+const PREVIEW_DEBOUNCE_MIN_LEN: usize = 10_000;
+
+/// How long typing has to pause before a long document's preview is re-rendered.
+const PREVIEW_DEBOUNCE: std::time::Duration = std::time::Duration::from_millis(150);
+
 impl AppModel {
     pub fn handle_edit(&mut self, action: text_editor::Action) -> Task<cosmic::Action<Message>> {
         let State::Ready {
@@ -24,6 +30,11 @@ impl AppModel {
         };
 
         let was_edit = action.is_edit();
+        // keyboard navigation (arrows, Home/End, PageUp/Down, with or without Shift)
+        let moves_cursor = matches!(
+            action,
+            text_editor::Action::Move(_) | text_editor::Action::Select(_)
+        );
         let cursor_before = editor.content.cursor().position;
 
         if let text_editor::Action::Edit(text_editor::Edit::Enter) = &action {
@@ -34,26 +45,67 @@ impl AppModel {
             editor.content.perform(action);
         }
 
-        preview.update_content(editor.content.text().as_ref());
-
-        if was_edit {
-            editor.is_dirty = true;
-            editor.push_history((cursor_before.line, cursor_before.column));
+        // clicks, selections, cursor moves and scrolling don't change the text:
+        // no need to re-render the preview or record history for them
+        if !was_edit {
+            // but moving the cursor with the keyboard should keep it on screen
+            return if moves_cursor {
+                ensure_cursor_visible()
+            } else {
+                Task::none()
+            };
         }
 
-        let sync_preview = self.config.scrollbar_sync == BoolState::Yes;
-        let cursor_task = if was_edit {
-            ensure_cursor_visible(editor, sync_preview)
+        let text = editor.content.text();
+
+        // short notes re-render right away, long ones wait until typing pauses
+        let preview_task = if text.len() <= PREVIEW_DEBOUNCE_MIN_LEN {
+            preview.update_content(&text);
+            utils::images::download_images(
+                &mut preview.markstate,
+                &mut preview.images_in_progress,
+                &editor.path,
+            )
         } else {
-            Task::none()
+            self.preview_generation = self.preview_generation.wrapping_add(1);
+            let generation = self.preview_generation;
+            Task::perform(
+                async move {
+                    tokio::time::sleep(PREVIEW_DEBOUNCE).await;
+                    generation
+                },
+                |generation| cosmic::action::app(Message::RefreshPreview(generation)),
+            )
         };
+
+        editor.is_dirty = true;
+        editor.push_history_text((cursor_before.line, cursor_before.column), text);
+
+        // batch, not chain: scrolling shouldn't wait for the preview or image downloads
+        Task::batch([preview_task, ensure_cursor_visible()])
+    }
+
+    /// Debounced preview re-render. Only the latest scheduled refresh does any work.
+    pub fn handle_refresh_preview(&mut self, generation: u64) -> Task<cosmic::Action<Message>> {
+        if generation != self.preview_generation {
+            // more typing happened since this one was scheduled
+            return Task::none();
+        }
+
+        let State::Ready {
+            editor, preview, ..
+        } = &mut self.state
+        else {
+            return Task::none();
+        };
+
+        preview.update_content(&editor.content.text());
 
         utils::images::download_images(
             &mut preview.markstate,
             &mut preview.images_in_progress,
             &editor.path,
         )
-        .chain(cursor_task)
     }
 
     pub fn handle_apply_formatting(
@@ -170,8 +222,7 @@ impl AppModel {
         editor.push_history((cursor_before.line, cursor_before.column));
         preview.update_content(editor.content.text().as_ref());
 
-        let sync_preview = self.config.scrollbar_sync == BoolState::Yes;
-        let cursor_task = ensure_cursor_visible(editor, sync_preview);
+        let cursor_task = ensure_cursor_visible();
 
         utils::images::download_images(
             &mut preview.markstate,
@@ -200,8 +251,7 @@ impl AppModel {
         editor.push_history((cursor_before.line, cursor_before.column));
         preview.update_content(editor.content.text().as_ref());
 
-        let sync_preview = self.config.scrollbar_sync == BoolState::Yes;
-        ensure_cursor_visible(editor, sync_preview)
+        ensure_cursor_visible()
     }
 
     fn no_image_in_clipboard_toast(&mut self) -> Task<cosmic::Action<Message>> {
@@ -255,6 +305,15 @@ impl AppModel {
         Task::none()
     }
 
+    pub fn handle_ensure_cursor_visible(&mut self) -> Task<cosmic::Action<Message>> {
+        let State::Ready { editor, .. } = &mut self.state else {
+            return Task::none();
+        };
+
+        let sync_preview = self.config.scrollbar_sync == BoolState::Yes;
+        scroll_to_cursor(editor, sync_preview)
+    }
+
     pub fn handle_undo(&mut self) -> Task<cosmic::Action<Message>> {
         let State::Ready {
             editor, preview, ..
@@ -265,11 +324,14 @@ impl AppModel {
 
         editor.undo(preview);
 
+        let cursor_task = ensure_cursor_visible();
+
         utils::images::download_images(
             &mut preview.markstate,
             &mut preview.images_in_progress,
             &editor.path,
         )
+        .chain(cursor_task)
     }
 
     pub fn handle_redo(&mut self) -> Task<cosmic::Action<Message>> {
@@ -282,11 +344,14 @@ impl AppModel {
 
         editor.redo(preview);
 
+        let cursor_task = ensure_cursor_visible();
+
         utils::images::download_images(
             &mut preview.markstate,
             &mut preview.images_in_progress,
             &editor.path,
         )
+        .chain(cursor_task)
     }
 
     pub fn handle_search(&mut self, action: SearchAction) -> Task<cosmic::Action<Message>> {
@@ -294,16 +359,13 @@ impl AppModel {
             return Task::none();
         };
 
-        let sync_preview = self.config.scrollbar_sync == BoolState::Yes;
-
         match action {
             SearchAction::ToggleSearch => {
                 editor.search.show_search_box = !editor.search.show_search_box;
                 // clear state when closing
                 if !editor.search.show_search_box {
                     editor.search = EditorSearchState::default();
-                    widgets::text_editor::focus(text_editor_id())
-                        .chain(ensure_cursor_visible(editor, sync_preview))
+                    widgets::text_editor::focus(text_editor_id()).chain(ensure_cursor_visible())
                 } else {
                     cosmic::widget::text_input::focus(search_input_id())
                 }
@@ -315,7 +377,7 @@ impl AppModel {
 
                 if let Some(idx) = editor.search.current_match_index {
                     editor.navigate_to_match(&editor.search.matches[idx].clone());
-                    ensure_cursor_visible(editor, sync_preview)
+                    ensure_cursor_visible()
                 } else {
                     Task::none()
                 }
@@ -327,7 +389,7 @@ impl AppModel {
 
                 if let Some(idx) = editor.search.current_match_index {
                     editor.navigate_to_match(&editor.search.matches[idx].clone());
-                    ensure_cursor_visible(editor, sync_preview)
+                    ensure_cursor_visible()
                 } else {
                     Task::none()
                 }
@@ -336,7 +398,7 @@ impl AppModel {
             SearchAction::NextResult => {
                 if let Some(m) = editor.search.next_match().cloned() {
                     editor.navigate_to_match(&m);
-                    ensure_cursor_visible(editor, sync_preview)
+                    ensure_cursor_visible()
                 } else {
                     Task::none()
                 }
@@ -345,7 +407,7 @@ impl AppModel {
             SearchAction::PrevResult => {
                 if let Some(m) = editor.search.prev_match().cloned() {
                     editor.navigate_to_match(&m);
-                    ensure_cursor_visible(editor, sync_preview)
+                    ensure_cursor_visible()
                 } else {
                     Task::none()
                 }
@@ -356,11 +418,17 @@ impl AppModel {
     }
 }
 
+/// Scrolls the editor so the cursor stays visible, once the current changes are laid out.
+///
+/// The editor only lays out (shapes) its text during the widget layout pass, so right after an
+/// edit (and especially after undo/redo, which replace the whole text) the caret position isn't
+/// known yet. Sending a message defers the work until after the next layout.
+fn ensure_cursor_visible() -> Task<cosmic::Action<Message>> {
+    Task::done(cosmic::action::app(Message::EnsureCursorVisible))
+}
+
 /// Scrolls the editor (and the preview, if synced) so the cursor stays visible.
-fn ensure_cursor_visible(
-    editor: &mut EditorState,
-    sync_preview: bool,
-) -> Task<cosmic::Action<Message>> {
+fn scroll_to_cursor(editor: &mut EditorState, sync_preview: bool) -> Task<cosmic::Action<Message>> {
     let Some(editor_vp) = editor.scroll.last_editor_viewport else {
         return Task::none();
     };

@@ -56,45 +56,39 @@ pub struct EditorSearchState {
 impl EditorState {
     pub fn push_history(&mut self, cursor_before: (usize, usize)) {
         let current_text = self.content.text();
+        self.push_history_text(cursor_before, current_text);
+    }
+
+    /// Same as [`Self::push_history`] when the caller already has the current text.
+    pub fn push_history_text(&mut self, cursor_before: (usize, usize), current_text: String) {
+        let history = &mut self.history;
+
+        // nothing actually changed (e.g. backspace at the start of the file)
+        if history.snapshot(history.history_index) == current_text {
+            return;
+        }
+
         let cursor_after = self.content.cursor().position;
 
-        // reconstruct the previous text so we can diff against it
-        let prev_text = super::history::apply_patch(
-            &self.history.history_base,
-            &self.history.history_patches[..self.history.history_index],
-        );
-        let patch = super::history::make_patch(&prev_text, &current_text);
+        // discard any redo steps above the current index
+        history.history_snapshots.truncate(history.history_index);
+        history.cursor_before.truncate(history.history_index);
+        history.cursor_after.truncate(history.history_index);
 
-        // discard any redo patches above current index
-        self.history
-            .history_patches
-            .truncate(self.history.history_index);
-        self.history
-            .cursor_before
-            .truncate(self.history.history_index);
-        self.history
-            .cursor_after
-            .truncate(self.history.history_index);
-
-        self.history.history_patches.push(patch);
-        self.history.cursor_before.push(cursor_before);
-        self.history
+        history.history_snapshots.push(current_text);
+        history.cursor_before.push(cursor_before);
+        history
             .cursor_after
             .push((cursor_after.line, cursor_after.column));
-        self.history.history_index = self.history.history_patches.len();
 
-        // keep only the last 100 patches; rebase onto the new base
-        if self.history.history_patches.len() > 100 {
-            // advance the base by applying the oldest patch
-            let new_base = super::history::apply_single(
-                &self.history.history_base,
-                &self.history.history_patches[0],
-            );
-            self.history.history_base = new_base;
-            self.history.cursor_before.remove(0);
-            self.history.cursor_after.remove(0);
-            self.history.history_index = self.history.history_patches.len();
+        // keep only the last MAX_HISTORY steps: the oldest snapshot becomes the new base
+        if history.history_snapshots.len() > super::history::MAX_HISTORY {
+            history.history_base = history.history_snapshots.remove(0);
+            history.cursor_before.remove(0);
+            history.cursor_after.remove(0);
         }
+
+        history.history_index = history.history_snapshots.len();
     }
 
     pub fn undo(&mut self, preview: &mut MarkdownPreview) {
@@ -107,10 +101,10 @@ impl EditorState {
                 .unwrap_or((0, 0));
 
             self.history.history_index -= 1;
-            let snapshot = super::history::apply_patch(
-                &self.history.history_base,
-                &self.history.history_patches[..self.history.history_index],
-            );
+            let snapshot = self
+                .history
+                .snapshot(self.history.history_index)
+                .to_string();
 
             self.content.replace_text(&snapshot);
             preview.update_content(&snapshot);
@@ -123,7 +117,7 @@ impl EditorState {
     }
 
     pub fn redo(&mut self, preview: &mut MarkdownPreview) {
-        if self.history.history_index < self.history.history_patches.len() {
+        if self.history.history_index < self.history.history_snapshots.len() {
             let (line, col) = self
                 .history
                 .cursor_after
@@ -132,10 +126,10 @@ impl EditorState {
                 .unwrap_or((0, 0));
 
             self.history.history_index += 1;
-            let snapshot = super::history::apply_patch(
-                &self.history.history_base,
-                &self.history.history_patches[..self.history.history_index],
-            );
+            let snapshot = self
+                .history
+                .snapshot(self.history.history_index)
+                .to_string();
 
             self.content.replace_text(&snapshot);
             preview.update_content(&snapshot);

@@ -80,6 +80,8 @@ pub struct AppModel {
     selected_nav_path: Option<PathBuf>,
     /// Folders expanded in the navbar (canonical paths, the vault root included)
     expanded_folders: HashSet<PathBuf>,
+    /// Bumped on every debounced preview refresh request; only the latest one re-renders
+    preview_generation: u64,
     /// Gotenberg client, needed for Pdf exporting
     gotenberg_client: gotenberg_pdf::Client,
     /// Application State
@@ -191,6 +193,10 @@ pub enum Message {
     Undo,
     /// Redo requested
     Redo,
+    /// Scroll the editor to the cursor (sent after edits, once the text is laid out)
+    EnsureCursorVisible,
+    /// Debounced preview re-render (carries the generation it was scheduled for)
+    RefreshPreview(u64),
     /// Search related action requested
     Search(SearchAction),
     /// Smart paste (pastes images as Markdown or standard text)
@@ -324,6 +330,7 @@ impl cosmic::Application for AppModel {
                 .collect(),
             selected_nav_path: None,
             expanded_folders: HashSet::new(),
+            preview_generation: 0,
             gotenberg_client: gotenberg_pdf::Client::new(&gotenberg_url),
             state: State::Loading,
         };
@@ -739,6 +746,9 @@ impl cosmic::Application for AppModel {
             Message::ApplyFormatting(action) => self.handle_apply_formatting(action),
             Message::Undo => self.handle_undo(),
             Message::Redo => self.handle_redo(),
+            Message::EnsureCursorVisible => self.handle_ensure_cursor_visible(),
+            Message::RefreshPreview(generation) => self.handle_refresh_preview(generation),
+
             Message::Search(action) => self.handle_search(action),
             Message::SmartPaste => self.handle_smart_paste(),
             Message::ClipboardData(mode, content) => self.handle_clipboard_data(mode, content),
