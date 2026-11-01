@@ -1,34 +1,22 @@
 // SPDX-License-Identifier: GPL-3.0
 
-use crate::app::core::project::ProjectNode;
+use crate::app::core::project::{canonical, remap_path};
 use crate::app::core::utils::{self, CedillaToast};
 use crate::app::{AppModel, Message, State};
 use cosmic::prelude::*;
-use cosmic::widget::segmented_button;
 use std::path::PathBuf;
 
 impl AppModel {
-    pub fn handle_delete_node(
-        &mut self,
-        entity: segmented_button::Entity,
-    ) -> Task<cosmic::Action<Message>> {
+    pub fn handle_delete_node(&mut self, path: PathBuf) -> Task<cosmic::Action<Message>> {
         let State::Ready { editor, .. } = &mut self.state else {
             return Task::none();
         };
 
-        let Some(node) = self.nav_model.data::<ProjectNode>(entity).cloned() else {
-            return Task::none();
-        };
-
-        let path = match &node {
-            ProjectNode::File { path, .. } => path.clone(),
-            ProjectNode::Folder { path, .. } => path.clone(),
-        };
-
         editor.ignore_next_external_change = true;
-        let delete_result = match &node {
-            ProjectNode::File { .. } => std::fs::remove_file(&path),
-            ProjectNode::Folder { .. } => std::fs::remove_dir_all(&path),
+        let delete_result = if path.is_dir() {
+            std::fs::remove_dir_all(&path)
+        } else {
+            std::fs::remove_file(&path)
         };
 
         if let Err(e) = delete_result {
@@ -36,11 +24,15 @@ impl AppModel {
             return self.handle_add_toast(CedillaToast::new(e));
         }
 
-        self.remove_nav_node(&path);
+        self.forget_nav_paths(&path);
+        self.rebuild_nav();
 
-        // if the deleted file was currently open, create a new empty file
+        // if the open file was deleted (directly or inside a deleted folder), start a new empty file
         if let State::Ready { editor, .. } = &self.state
-            && editor.path.as_deref() == Some(&path)
+            && editor
+                .path
+                .as_deref()
+                .is_some_and(|p| canonical(p).starts_with(&path))
         {
             return self.handle_new_file();
         }
@@ -50,30 +42,17 @@ impl AppModel {
 
     pub fn handle_rename_node(
         &mut self,
-        entity: segmented_button::Entity,
+        old_path: PathBuf,
         new_name: String,
     ) -> Task<cosmic::Action<Message>> {
         let State::Ready { editor, .. } = &mut self.state else {
             return Task::none();
         };
 
-        let Some(node) = self.nav_model.data::<ProjectNode>(entity).cloned() else {
-            return Task::none();
-        };
-
-        let old_path = match &node {
-            ProjectNode::File { path, .. } | ProjectNode::Folder { path, .. } => path.clone(),
-        };
-
-        let new_name = match &node {
-            ProjectNode::File { .. } => {
-                if new_name.ends_with(".md") {
-                    new_name
-                } else {
-                    format!("{}.md", new_name)
-                }
-            }
-            ProjectNode::Folder { .. } => new_name,
+        let new_name = if old_path.is_dir() || new_name.ends_with(".md") {
+            new_name
+        } else {
+            format!("{}.md", new_name)
         };
 
         let new_path = match old_path.parent() {
@@ -98,48 +77,47 @@ impl AppModel {
             return self.handle_add_toast(CedillaToast::new(e));
         }
 
-        self.rename_nav_node(&old_path, &new_path, &new_name);
+        self.remap_nav_paths(&old_path, &new_path);
 
         // update the open editor state if the open file was inside the renamed path
-        #[allow(clippy::collapsible_if)]
-        if let State::Ready { editor, .. } = &mut self.state {
-            if let Some(current) = editor.path.as_deref() {
-                if current.starts_with(&old_path) {
-                    let suffix = current.strip_prefix(&old_path).unwrap().to_path_buf();
-                    editor.path = Some(if suffix == std::path::Path::new("") {
-                        new_path.clone()
-                    } else {
-                        new_path.join(suffix)
-                    });
-                }
-            }
+        if let State::Ready { editor, .. } = &mut self.state
+            && let Some(current) = editor.path.as_deref()
+        {
+            editor.path = Some(remap_path(&canonical(current), &old_path, &new_path));
         }
+
+        // rebuild after updating the editor path so the renamed file stays highlighted
+        self.rebuild_nav();
 
         Task::none()
     }
 
     pub fn handle_move_node(
         &mut self,
-        source_entity: segmented_button::Entity,
+        source_path: PathBuf,
         target_path: PathBuf,
     ) -> Task<cosmic::Action<Message>> {
         let State::Ready { editor, .. } = &mut self.state else {
             return Task::none();
         };
 
-        let source_path = match self.nav_model.data::<ProjectNode>(source_entity) {
-            Some(ProjectNode::File { path, .. } | ProjectNode::Folder { path, .. }) => path.clone(),
-            None => return Task::none(),
-        };
-
         let file_name = match source_path.file_name() {
             Some(n) => n,
             None => return Task::none(),
         };
+        let target_path = canonical(&target_path);
         let dest = target_path.join(file_name);
 
         if source_path == target_path || dest == source_path {
             return Task::none();
+        }
+
+        // fs::rename would silently overwrite an existing file
+        if dest.exists() {
+            return self.handle_add_toast(CedillaToast::new(format!(
+                "A file or folder named {:?} already exists there",
+                file_name
+            )));
         }
 
         editor.ignore_next_external_change = true;
@@ -148,27 +126,17 @@ impl AppModel {
             return self.handle_add_toast(CedillaToast::new(e));
         }
 
-        let target_entity = self.nav_model.iter().find(|&id| {
-            matches!(
-                self.nav_model.data::<ProjectNode>(id),
-                Some(ProjectNode::Folder { path, .. }) if *path == target_path
-            )
-        });
-
-        if let Some(target_entity) = target_entity {
-            self.move_nav_node(source_entity, target_entity, &dest);
-        } else {
-            // target folder was never opened, reload from disk
-            let vault_path = self.config.vault_path();
-            self.nav_model.clear();
-            self.open_vault_folder(&vault_path);
-        }
+        self.remap_nav_paths(&source_path, &dest);
 
         if let State::Ready { editor, .. } = &mut self.state
-            && editor.path.as_deref() == Some(&source_path)
+            && let Some(current) = editor.path.as_deref()
         {
-            editor.path = Some(dest);
+            editor.path = Some(remap_path(&canonical(current), &source_path, &dest));
         }
+
+        // open the destination folder so the user sees where the item went
+        self.reveal_in_nav(&dest);
+        self.rebuild_nav();
 
         Task::none()
     }
@@ -214,12 +182,12 @@ impl AppModel {
                     }
                 }
 
-                // clear the navbar
-                self.core.nav_bar_set_toggled(false);
-                self.nav_model.clear();
-
-                // load vault
-                self.open_vault_folder(self.config.vault_path());
+                // load the vault at its new location
+                self.expanded_folders.clear();
+                self.expanded_folders
+                    .insert(canonical(&self.config.vault_path()));
+                self.selected_nav_path = None;
+                self.rebuild_nav();
 
                 Task::done(cosmic::action::app(Message::NewFile))
             }

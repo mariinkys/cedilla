@@ -17,11 +17,11 @@ pub enum DialogPage {
     /// Dialog for creating a new folder on the vault
     NewVaultFolder(String),
     /// Delete the currently selected folder/file
-    DeleteNode(cosmic::widget::segmented_button::Entity),
+    DeleteNode(PathBuf),
     /// Rename the currently selected folder/file
-    RenameNode(cosmic::widget::segmented_button::Entity, String),
-    /// Move the given entity to a selected folder first entity = what to move, second = selected target folder (None if none chosen yet)
-    MoveNode(cosmic::widget::segmented_button::Entity, Option<PathBuf>),
+    RenameNode(PathBuf, String),
+    /// Move the given path to a selected folder: first = what to move, second = selected target folder (None if none chosen yet)
+    MoveNode(PathBuf, Option<PathBuf>),
     /// Dialog for when closing a file with pending changes
     ConfirmCloseFile(DiscardChangesAction),
     /// Open file was modified externally
@@ -100,7 +100,7 @@ impl DialogPage {
                     ])
                     .spacing(spacing.space_xxs),
                 ),
-            DialogPage::RenameNode(entity, new_name) => widget::dialog()
+            DialogPage::RenameNode(node_path, new_name) => widget::dialog()
                 .title(fl!("rename"))
                 .primary_action(
                     widget::button::suggested(fl!("rename"))
@@ -117,7 +117,7 @@ impl DialogPage {
                             .id(dialog_state.dialog_text_input.clone())
                             .on_input(move |name| {
                                 Message::DialogAction(DialogAction::DialogUpdate(
-                                    DialogPage::RenameNode(*entity, name),
+                                    DialogPage::RenameNode(node_path.clone(), name),
                                 ))
                             })
                             .on_submit(|_x| Message::DialogAction(DialogAction::DialogComplete))
@@ -125,7 +125,7 @@ impl DialogPage {
                     ])
                     .spacing(spacing.space_xxs),
                 ),
-            DialogPage::MoveNode(source_entity, selected_target) => {
+            DialogPage::MoveNode(source_path, selected_target) => {
                 let folder_list = widget::column::with_children(
                     dialog_state
                         .available_folders
@@ -144,7 +144,7 @@ impl DialogPage {
                                 .spacing(spacing.space_xxs),
                             )
                             .on_press(Message::DialogAction(DialogAction::DialogUpdate(
-                                DialogPage::MoveNode(*source_entity, Some(path.clone())),
+                                DialogPage::MoveNode(source_path.clone(), Some(path.clone())),
                             )))
                             .class(if is_selected {
                                 theme::Button::Suggested
@@ -236,11 +236,11 @@ pub enum DialogAction {
     /// Asks to open the [`DialogPage`] for creating a new vault folder
     OpenNewVaultFolderDialog,
     /// Asks to open the [`DialogPage`] for deleting a vault folder/file
-    OpenDeleteNodeDialog(cosmic::widget::segmented_button::Entity),
+    OpenDeleteNodeDialog(PathBuf),
     /// Asks to open the [`DialogPage`] for renaming a vault folder/file
-    OpenRenameNodeDialog(cosmic::widget::segmented_button::Entity),
+    OpenRenameNodeDialog(PathBuf),
     /// Asks to open the [`DialogPage`] for moving a node in the vault
-    OpenMoveNodeDialog(cosmic::widget::segmented_button::Entity),
+    OpenMoveNodeDialog(PathBuf),
     /// Asks to open the [`DialogPage`] for asking confirmation before closing a file
     OpenConfirmCloseFileDialog(DiscardChangesAction),
     /// Action after user confirms wants to discard changes on Save dialog

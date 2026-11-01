@@ -13,349 +13,130 @@ use std::{
 };
 
 use crate::{
-    app::AppModel,
+    app::{AppModel, State},
     icons::{self},
 };
 
 impl AppModel {
-    pub fn open_vault_folder<P: AsRef<Path>>(&mut self, path: P) {
-        let path = path.as_ref();
+    /// Rebuilds the whole navbar from disk.
+    ///
+    /// Folders in `expanded_folders` are shown open, everything is sorted (folders first),
+    /// and the currently open file gets highlighted. Every operation that changes the tree
+    /// updates the state and calls this, so the navbar can never drift from what's on disk.
+    pub fn rebuild_nav(&mut self) {
+        let vault_path = canonical(&self.config.vault_path());
 
-        if let Ok(mut node) = ProjectNode::new(path) {
-            if let ProjectNode::Folder { open, root, .. } = &mut node {
-                *open = true;
-                *root = true;
-            }
-            let id = self
-                .nav_model
-                .insert()
-                .icon(node.icon(18))
-                .text("Cedilla Vault")
-                .data(node)
-                .id();
+        self.nav_model.clear();
 
-            let position = self.nav_model.position(id).unwrap_or(0);
-            self.open_folder(path, position + 1, 1);
+        let Ok(mut root) = ProjectNode::new(&vault_path) else {
+            return;
+        };
+
+        let root_open = self.expanded_folders.contains(&vault_path);
+        if let ProjectNode::Folder { open, root, .. } = &mut root {
+            *open = root_open;
+            *root = true;
         }
+
+        self.nav_model
+            .insert()
+            .indent(0)
+            .icon(root.icon(18))
+            .text("Cedilla Vault")
+            .data(root);
+
+        if root_open {
+            self.insert_folder_children(&vault_path, 1);
+        }
+
+        self.sync_nav_selection();
     }
 
-    pub fn open_folder<P: AsRef<Path>>(&mut self, path: P, mut position: u16, indent: u16) {
-        let mut nodes = Vec::new();
-        for entry_res in ignore::WalkBuilder::new(&path)
-            .hidden(false)
-            .max_depth(Some(1))
-            .build()
-        {
-            let entry = match entry_res {
-                Ok(ok) => ok,
-                Err(_) => continue,
-            };
-            if entry.depth() == 0 {
-                continue;
-            }
-            if entry.file_type().is_some_and(|ft| ft.is_file()) {
-                match entry.path().extension().and_then(std::ffi::OsStr::to_str) {
-                    Some("md") | Some("txt") => {}
-                    _ => continue,
+    /// Appends the (sorted) children of `dir`, recursing into expanded folders.
+    fn insert_folder_children(&mut self, dir: &Path, indent: u16) {
+        for mut node in read_folder(dir) {
+            let expanded_path = match &mut node {
+                ProjectNode::Folder { path, open, .. } => {
+                    *open = self.expanded_folders.contains(path);
+                    open.then(|| path.clone())
                 }
-            }
-            let node = match ProjectNode::new(entry.path()) {
-                Ok(ok) => ok,
-                Err(_) => continue,
+                ProjectNode::File { .. } => None,
             };
-            nodes.push(node);
-        }
 
-        nodes.sort();
-
-        for node in nodes {
             self.nav_model
                 .insert()
-                .position(position)
                 .indent(indent)
                 .icon(node.icon(18))
                 .text(node.name().to_string())
                 .data(node);
-            position += 1;
+
+            if let Some(path) = expanded_path {
+                self.insert_folder_children(&path, indent + 1);
+            }
         }
     }
 
-    pub fn insert_file_node(&mut self, file_path: &PathBuf, parent_dir: &PathBuf) {
-        let Ok(node) = ProjectNode::new(file_path) else {
-            return;
+    /// Highlights the navbar entry of the file open in the editor (or nothing).
+    pub fn sync_nav_selection(&mut self) {
+        let open_file = match &self.state {
+            State::Ready { editor, .. } => editor.path.as_deref().map(canonical),
+            _ => None,
         };
 
-        let (insert_position, insert_indent) = {
-            let mut pos = 0u16;
-            let mut indent = 1u16;
-            for nav_id in self.nav_model.iter() {
-                if let Some(ProjectNode::Folder { path, .. }) =
-                    self.nav_model.data::<ProjectNode>(nav_id)
-                {
-                    if *path == *parent_dir {
-                        let folder_pos = self.nav_model.position(nav_id).unwrap_or(0);
-                        let folder_indent = self.nav_model.indent(nav_id).unwrap_or(0);
+        let entity = open_file.and_then(|open_file| {
+            self.nav_model.iter().find(|&id| {
+                matches!(
+                    self.nav_model.data::<ProjectNode>(id),
+                    Some(ProjectNode::File { path, .. }) if *path == open_file
+                )
+            })
+        });
 
-                        let children: Vec<(u16, u16)> = self
-                            .nav_model
-                            .iter()
-                            .filter_map(|child_id| {
-                                let child_pos = self.nav_model.position(child_id)?;
-                                let child_indent = self.nav_model.indent(child_id)?;
-                                Some((child_pos, child_indent))
-                            })
-                            .collect();
-
-                        let mut insert_at = folder_pos + 1;
-                        for (child_pos, child_indent) in &children {
-                            if *child_pos == insert_at && *child_indent > folder_indent {
-                                insert_at += 1;
-                            }
-                        }
-
-                        pos = insert_at;
-                        indent = folder_indent + 1;
-                        break;
-                    }
-                }
-            }
-            (pos, indent)
-        };
-
-        self.nav_model
-            .insert()
-            .position(insert_position)
-            .indent(insert_indent)
-            .icon(node.icon(18))
-            .text(node.name().to_string())
-            .data(node);
+        match entity {
+            Some(id) => self.nav_model.activate(id),
+            None => self.nav_model.deactivate(),
+        }
     }
 
-    pub fn insert_folder_node(&mut self, folder_path: &PathBuf, parent_dir: &PathBuf) {
-        let Ok(node) = ProjectNode::new(folder_path) else {
+    /// Expands every folder between the vault root and `path` so `path` is visible.
+    /// Does nothing for paths outside the vault. Call `rebuild_nav` afterwards.
+    pub fn reveal_in_nav(&mut self, path: &Path) {
+        let vault_path = canonical(&self.config.vault_path());
+        let path = canonical(path);
+
+        if !path.starts_with(&vault_path) {
             return;
-        };
+        }
 
-        let (insert_position, insert_indent) = {
-            let mut pos = 0u16;
-            let mut indent = 1u16;
-            for nav_id in self.nav_model.iter() {
-                if let Some(ProjectNode::Folder { path, .. }) =
-                    self.nav_model.data::<ProjectNode>(nav_id)
-                {
-                    if *path == *parent_dir {
-                        let folder_pos = self.nav_model.position(nav_id).unwrap_or(0);
-                        let folder_indent = self.nav_model.indent(nav_id).unwrap_or(0);
-
-                        let children: Vec<(u16, u16, bool)> = self
-                            .nav_model
-                            .iter()
-                            .filter_map(|child_id| {
-                                let child_pos = self.nav_model.position(child_id)?;
-                                let child_indent = self.nav_model.indent(child_id)?;
-                                let is_file = matches!(
-                                    self.nav_model.data::<ProjectNode>(child_id),
-                                    Some(ProjectNode::File { .. })
-                                );
-                                Some((child_pos, child_indent, is_file))
-                            })
-                            .collect();
-
-                        let mut insert_at = folder_pos + 1;
-                        for (child_pos, child_indent, is_file) in &children {
-                            if *child_pos == insert_at && *child_indent > folder_indent {
-                                if *is_file {
-                                    break;
-                                }
-                                insert_at += 1;
-                            }
-                        }
-
-                        pos = insert_at;
-                        indent = folder_indent + 1;
-                        break;
-                    }
-                }
-            }
-            (pos, indent)
-        };
-
-        self.nav_model
-            .insert()
-            .position(insert_position)
-            .indent(insert_indent)
-            .icon(node.icon(16))
-            .text(node.name().to_string())
-            .data(node);
-    }
-
-    pub fn remove_nav_node(&mut self, target_path: &PathBuf) {
-        let entity_opt =
-            self.nav_model
-                .iter()
-                .find(|&id| match self.nav_model.data::<ProjectNode>(id) {
-                    Some(ProjectNode::File { path, .. }) => path == target_path,
-                    Some(ProjectNode::Folder { path, .. }) => path == target_path,
-                    None => false,
-                });
-
-        let Some(entity) = entity_opt else { return };
-
-        let position = self.nav_model.position(entity).unwrap_or(0);
-        let indent = self.nav_model.indent(entity).unwrap_or(0);
-
-        // remove all children (if it's a folder)
-        while let Some(child) = self.nav_model.entity_at(position + 1) {
-            if self.nav_model.indent(child).unwrap_or(0) > indent {
-                self.nav_model.remove(child);
-            } else {
+        for ancestor in path.ancestors().skip(1) {
+            self.expanded_folders.insert(ancestor.to_path_buf());
+            if ancestor == vault_path {
                 break;
             }
         }
+    }
 
-        // remove the node itself
-        self.nav_model.remove(entity);
+    /// Updates navbar state after `old` was renamed or moved to `new`.
+    pub fn remap_nav_paths(&mut self, old: &Path, new: &Path) {
+        self.expanded_folders = self
+            .expanded_folders
+            .drain()
+            .map(|p| remap_path(&p, old, new))
+            .collect();
 
-        // clear selected path if it was inside the deleted path
         if let Some(selected) = &self.selected_nav_path {
-            if selected.starts_with(target_path) || selected == target_path {
-                self.selected_nav_path = None;
-            }
+            self.selected_nav_path = Some(remap_path(selected, old, new));
         }
     }
 
-    pub fn rename_nav_node(&mut self, old_path: &Path, new_path: &Path, new_name: &str) {
-        let ids: Vec<_> = self.nav_model.iter().collect();
-
-        for child_id in ids {
-            let is_renamed_node = if let Some(child_node) =
-                self.nav_model.data_mut::<ProjectNode>(child_id)
-            {
-                match child_node {
-                    ProjectNode::File { path, name } | ProjectNode::Folder { path, name, .. } => {
-                        if path.starts_with(old_path) {
-                            let suffix = path.strip_prefix(old_path).unwrap().to_path_buf();
-                            *path = if suffix == std::path::Path::new("") {
-                                new_path.to_path_buf()
-                            } else {
-                                new_path.join(&suffix)
-                            };
-                            if suffix == std::path::Path::new("") {
-                                *name = new_name.to_string();
-                                true
-                            } else {
-                                false
-                            }
-                        } else {
-                            false
-                        }
-                    }
-                }
-            } else {
-                false
-            };
-            if is_renamed_node {
-                self.nav_model.text_set(child_id, new_name.to_string());
-            }
-        }
+    /// Updates navbar state after `removed` was deleted.
+    pub fn forget_nav_paths(&mut self, removed: &Path) {
+        self.expanded_folders.retain(|p| !p.starts_with(removed));
 
         if let Some(selected) = &self.selected_nav_path {
-            if selected.starts_with(old_path) {
-                let suffix = selected.strip_prefix(old_path).unwrap().to_path_buf();
-                self.selected_nav_path = Some(if suffix == std::path::Path::new("") {
-                    new_path.to_path_buf()
-                } else {
-                    new_path.join(suffix)
-                });
+            if selected.starts_with(removed) {
+                self.selected_nav_path = removed.parent().map(Path::to_path_buf);
             }
-        }
-    }
-
-    pub fn move_nav_node(
-        &mut self,
-        source_entity: cosmic::widget::segmented_button::Entity,
-        target_entity: cosmic::widget::segmented_button::Entity,
-        new_path: &PathBuf,
-    ) {
-        let source_indent = self.nav_model.indent(source_entity).unwrap_or(0);
-        let source_position = self.nav_model.position(source_entity).unwrap_or(0);
-
-        // collect children by walking positions sequentially after source
-        let children: Vec<cosmic::widget::segmented_button::Entity> = {
-            let mut result = Vec::new();
-            let mut pos = source_position + 1;
-            while let Some(id) = self.nav_model.entity_at(pos) {
-                if self.nav_model.indent(id).unwrap_or(0) > source_indent {
-                    result.push(id);
-                    pos += 1;
-                } else {
-                    break;
-                }
-            }
-            result
-        };
-
-        for child in children.iter().rev() {
-            self.nav_model.remove(*child);
-        }
-        self.nav_model.remove(source_entity);
-
-        // re-read target position/indent after removals since positions shifted
-        let target_position = self.nav_model.position(target_entity).unwrap_or(0);
-        let target_indent = self.nav_model.indent(target_entity).unwrap_or(0);
-
-        let target_is_open = matches!(
-            self.nav_model.data::<ProjectNode>(target_entity),
-            Some(ProjectNode::Folder { open: true, .. })
-        );
-
-        // if target is closed, don't insert anything, on_nav_select will
-        // populate it correctly from disk when the user opens it
-        if !target_is_open {
-            return;
-        }
-
-        // find insertion point after all existing children of target
-        let insert_position = {
-            let mut pos = target_position + 1;
-            let mut check = target_position + 1;
-            while let Some(id) = self.nav_model.entity_at(check) {
-                if self.nav_model.indent(id).unwrap_or(0) > target_indent {
-                    let child_is_folder = matches!(
-                        self.nav_model.data::<ProjectNode>(id),
-                        Some(ProjectNode::Folder { .. })
-                    );
-                    let source_is_folder = new_path.is_dir();
-                    if source_is_folder {
-                        if child_is_folder {
-                            pos = check + 1;
-                        }
-                    } else {
-                        pos = check + 1;
-                    }
-                    check += 1;
-                } else {
-                    break;
-                }
-            }
-            pos
-        };
-
-        let Ok(node) = ProjectNode::new(new_path) else {
-            return;
-        };
-
-        self.nav_model
-            .insert()
-            .position(insert_position)
-            .indent(target_indent + 1)
-            .icon(node.icon(18))
-            .text(node.name().to_string())
-            .data(node);
-
-        // populate children only if source was a folder (target is already confirmed open)
-        if new_path.is_dir() {
-            self.open_folder(new_path, insert_position + 1, target_indent + 2);
         }
     }
 
@@ -368,14 +149,9 @@ impl AppModel {
     pub fn collect_all_folders(
         &self,
         vault_path: &PathBuf,
-        exclude_entity: cosmic::widget::segmented_button::Entity,
+        exclude_path: &Path,
     ) -> Vec<(PathBuf, String, u16)> {
-        let exclude_path = self
-            .nav_model
-            .data::<ProjectNode>(exclude_entity)
-            .map(|n| match n {
-                ProjectNode::Folder { path, .. } | ProjectNode::File { path, .. } => path.clone(),
-            });
+        let exclude_path = Some(exclude_path.to_path_buf());
 
         let mut result = Vec::new();
 
@@ -440,6 +216,43 @@ impl AppModel {
             self.collect_folders_recursive(&subdir, indent + 1, exclude_path, result);
         }
     }
+}
+
+/// Canonical form of `path`, or `path` itself if it can't be resolved (e.g. it was deleted).
+pub fn canonical(path: &Path) -> PathBuf {
+    fs::canonicalize(path).unwrap_or_else(|_| path.to_path_buf())
+}
+
+/// If `path` is `old` or lives inside it, returns the equivalent path under `new`.
+pub fn remap_path(path: &Path, old: &Path, new: &Path) -> PathBuf {
+    match path.strip_prefix(old) {
+        Ok(suffix) if suffix.as_os_str().is_empty() => new.to_path_buf(),
+        Ok(suffix) => new.join(suffix),
+        Err(_) => path.to_path_buf(),
+    }
+}
+
+/// Reads the direct children of `dir` that belong in the navbar (folders and .md/.txt files),
+/// sorted with folders first.
+fn read_folder(dir: &Path) -> Vec<ProjectNode> {
+    let mut nodes: Vec<ProjectNode> = ignore::WalkBuilder::new(dir)
+        .hidden(false)
+        .max_depth(Some(1))
+        .build()
+        .filter_map(Result::ok)
+        .filter(|entry| entry.depth() == 1)
+        .filter(|entry| {
+            !entry.file_type().is_some_and(|ft| ft.is_file())
+                || matches!(
+                    entry.path().extension().and_then(std::ffi::OsStr::to_str),
+                    Some("md" | "txt")
+                )
+        })
+        .filter_map(|entry| ProjectNode::new(entry.path()).ok())
+        .collect();
+
+    nodes.sort();
+    nodes
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
