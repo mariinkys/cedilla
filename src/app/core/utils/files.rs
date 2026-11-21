@@ -1,7 +1,10 @@
 // SPDX-License-Identifier: GPL-3.0
 
 use anywho::anywho;
-use cosmic::dialog::{ashpd::desktop::file_chooser::SelectedFiles, file_chooser::FileFilter};
+use cosmic::dialog::{
+    ashpd::{Uri, desktop::file_chooser::SelectedFiles},
+    file_chooser::FileFilter,
+};
 use std::{path::PathBuf, sync::Arc};
 
 pub async fn load_file(path: PathBuf) -> Result<(PathBuf, Arc<String>), anywho::Error> {
@@ -149,13 +152,7 @@ pub async fn open_markdown_file_picker() -> Option<String> {
         .response();
 
     if let Ok(result) = result {
-        result
-            .uris()
-            .iter()
-            .map(|file| file.path().to_string())
-            .collect::<Vec<String>>()
-            .first()
-            .cloned()
+        result.uris().iter().find_map(uri_path)
     } else {
         None
     }
@@ -181,13 +178,7 @@ pub async fn open_markdown_file_saver(vault_path: String) -> Option<String> {
         .response();
 
     if let Ok(result) = result {
-        result
-            .uris()
-            .iter()
-            .map(|file| file.path().to_string())
-            .collect::<Vec<String>>()
-            .first()
-            .cloned()
+        result.uris().iter().find_map(uri_path)
     } else {
         None
     }
@@ -206,13 +197,7 @@ pub async fn open_pdf_file_saver() -> Option<String> {
         .response();
 
     if let Ok(result) = result {
-        result
-            .uris()
-            .iter()
-            .map(|file| file.path().to_string())
-            .collect::<Vec<String>>()
-            .first()
-            .cloned()
+        result.uris().iter().find_map(uri_path)
     } else {
         None
     }
@@ -233,18 +218,19 @@ pub async fn open_folder_picker(vault_path: String) -> Option<String> {
         .response();
 
     if let Ok(result) = result {
-        result
-            .uris()
-            .iter()
-            .map(|file| {
-                percent_encoding::percent_decode_str(file.path())
-                    .decode_utf8_lossy()
-                    .into_owned()
-            })
-            .collect::<Vec<String>>()
-            .first()
-            .cloned()
+        result.uris().iter().find_map(uri_path).map(|p| {
+            percent_encoding::percent_decode_str(&p)
+                .decode_utf8_lossy()
+                .into_owned()
+        })
     } else {
         None
     }
+}
+
+/// Path component of a portal file URI, still percent-encoded (same as the old `Url::path()`).
+fn uri_path(uri: &Uri) -> Option<String> {
+    url::Url::parse(uri.as_str())
+        .ok()
+        .map(|u| u.path().to_string())
 }

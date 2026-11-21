@@ -3,9 +3,7 @@
 // https://github.com/Mrmayman/frostmark
 //
 
-use std::{
-    collections::{HashMap, HashSet},
-};
+use std::collections::{HashMap, HashSet};
 
 use html5ever::{ParseOpts, tendril::TendrilSink};
 use markup5ever_rcdom::RcDom;
@@ -83,29 +81,18 @@ impl MarkState {
     #[must_use]
     #[cfg(feature = "markdown")]
     pub fn with_html_and_markdown(input: &str) -> Self {
-        let html = comrak::markdown_to_html(
-            input,
-            &comrak::Options {
-                extension: comrak::options::Extension {
-                    strikethrough: true,
-                    cjk_friendly_emphasis: true,
-                    tasklist: true,
-                    superscript: true,
-                    subscript: true,
-                    underline: true,
-                    table: true,
-                    ..Default::default()
-                },
-                parse: comrak::options::Parse::default(),
-                render: comrak::options::Render {
-                    // Our renderer doesn't have the
-                    // vulnerabilities of a browser
-                    r#unsafe: true,
-                    ..Default::default()
-                },
-            },
-        );
+        let mut options = comrak::Options::default();
+        options.extension.strikethrough = true;
+        options.extension.cjk_friendly_emphasis = true;
+        options.extension.tasklist = true;
+        options.extension.superscript = true;
+        options.extension.subscript = true;
+        options.extension.underline = true;
+        options.extension.table = true;
+        // Our renderer doesn't have the vulnerabilities of a browser
+        options.render.r#unsafe = true;
 
+        let html = comrak::markdown_to_html(input, &options);
         Self::with_html(&html)
     }
 

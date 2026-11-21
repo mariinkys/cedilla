@@ -105,7 +105,9 @@ pub fn save_image_bytes(
 ) -> Result<String, anywho::Error> {
     std::fs::create_dir_all(target_dir)?;
 
-    let timestamp = jiff::Zoned::now().strftime("%Y%m%d_%H%M%S").to_string();
+    let timestamp = jiff::ZonedDateTime::now()
+        .strftime("%Y%m%d_%H%M%S")
+        .to_string();
     let mut file_name = format!("image_{timestamp}.{extension}");
     let mut file_path = target_dir.join(&file_name);
     let mut counter = 1;

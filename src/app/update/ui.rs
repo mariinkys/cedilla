@@ -29,7 +29,8 @@ impl AppModel {
     }
 
     pub fn handle_copy_to_clipboard(&mut self, content: String) -> Task<cosmic::Action<Message>> {
-        iced::clipboard::write(content).chain(self.handle_add_toast(CedillaToast::new(fl!("copied-to-clipboard"))))
+        iced::clipboard::write(content)
+            .chain(self.handle_add_toast(CedillaToast::new(fl!("copied-to-clipboard"))))
     }
 
     pub fn handle_toggle_context_page(
